@@ -12,31 +12,32 @@ talos project
 * 完善的测试
 * 完整的文档
 
-首先setup.py install 安装talos</br>
-运行talos生成工具生成项目</br>
+首先setup.py install 安装talos,运行talos生成工具生成项目
 
 ## talos_generator示例
 
-talos_generator</br>
-请输入项目生成目录：./</br>
-请输入项目名称(英)：storage</br>
-请输入生成类型[project,app,其他内容退出]：project</br>
-请输入项目版本：1.2.43432</br>
-请输入项目作者：Roy</br>
-请输入项目作者Email：roy@test.com</br>
-请输入项目启动配置目录：./etc</br>
-请输入项目DB连接串：postgresql+psycopg2://postgres:123456@127.0.0.1/testdb</br>
-创建项目目录：./storage</br>
-创建项目：storage(1.2.43432)通用文件</br>
-创建启动服务脚本</br>
-创建启动配置：./etc/storage.conf</br>
-创建中间件目录</br>
-完成</br>
-请输入生成类型[project,app,其他内容退出]：app</br>
-请输入app名称(英)：nas</br>
-创建app目录：./storage/storage/apps</br>
-创建app脚本：nas</br>
-完成</br>
-请输入生成类型[project,app,其他内容退出]：</br>
-</br>
+```
+> talos_generator
+> 请输入项目生成目录：./
+> 请输入项目名称(英)：storage
+> 请输入生成类型[project,app,其他内容退出]：project
+> 请输入项目版本：1.2.43432
+> 请输入项目作者：Roy
+> 请输入项目作者Email：roy@test.com
+> 请输入项目启动配置目录：./etc
+> 请输入项目DB连接串：postgresql+psycopg2://postgres:123456@127.0.0.1/testdb
+### 创建项目目录：./storage
+### 创建项目：storage(1.2.43432)通用文件
+### 创建启动服务脚本
+### 创建启动配置：./etc/storage.conf
+### 创建中间件目录
+### 完成
+> 请输入生成类型[project,app,其他内容退出]：app
+### 请输入app名称(英)：nas
+### 创建app目录：./storage/storage/apps
+### 创建app脚本：nas
+### 完成
+> 请输入生成类型[project,app,其他内容退出]：
+```
 
+</br>
