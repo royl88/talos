@@ -1,0 +1,17 @@
+*.pyc
+*.pyd
+*.so
+.coverage
+.eggs
+.project
+.pydevproject
+.settings/
+.tox/
+.cache/
+unit_test_report.html
+assets/
+talos.egg-info/
+htmlcov/
+.idea
+.output
+*.log
