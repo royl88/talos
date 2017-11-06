@@ -124,7 +124,7 @@ class Configuration(object):
         self._config = config
 
 
-def setup(path, default_opts=None, dir_path=None, ignore_undefined=True):
+def setup(path, default_opts=None, dir_path=None, ignore_undefined=False):
     """
     载入配置文件
 
