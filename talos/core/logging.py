@@ -46,3 +46,12 @@ def setup():
     handler.setFormatter(formatter)
     logging.getLogger().addHandler(handler)
     logging.captureWarnings(True)
+    loggers_configs = getattr(CONF.log, 'loggers', [])
+    for log_config in loggers_configs:
+        logger = logging.getLogger(log_config['name'])
+        logger.setLevel(levelmap.get(log_config.get('level', CONF.log.level.upper()).upper(), logging.INFO))
+        handler = WatchedFileHandler(log_config['path'])
+        handler.setLevel(levelmap.get(log_config.get('level', CONF.log.level.upper()).upper(), logging.INFO))
+        formatter = logging.Formatter(fmt=CONF.log.format_string, datefmt=CONF.log.date_format_string)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
