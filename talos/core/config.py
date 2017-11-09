@@ -151,12 +151,25 @@ UNSET = ValueNotSet()
 CONFIG_OPTS = {
     'host': utils.get_hostname(),
     'language': 'en',
-    "locale_app": UNSET,
-    "locale_path": UNSET,
+    'locale_app': UNSET,
+    'locale_path': UNSET,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
         'backlog': 2048,
+    },
+    'log': {
+        'gunicorn_access': UNSET,
+        'gunicorn_error': UNSET,
+        'path': './server.log',
+        'level': 'INFO',
+        'format_string': '%(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s',
+        'date_format_string': '%Y-%m-%d %H:%M:%S',
+        # 'loggers': [
+        #     {'name': 'talos.apps.app_name',
+        #      'path': './server2.log',
+        #      'level': 'INFO', }
+        # ]
     },
     'db': {
         'connection': UNSET,
