@@ -566,16 +566,20 @@ class ResourceBase(object):
 
         with self.transaction() as session:
 
-            resource(transaction=session).add()
+            self.create()
 
-            resource(transaction=session).update()
+            self.update()
 
-            resource(transaction=session).delete()
+            self.delete()
+            
+            OtherResource(transaction=session).create()
         """
         session = None
         if self._transaction is None:
             try:
+                old_transaction = self._transaction
                 session = self._pool.transaction()
+                self._transaction = session
                 yield session
                 session.commit()
             except Exception as e:
@@ -584,6 +588,7 @@ class ResourceBase(object):
                     session.rollback()
                 raise e
             finally:
+                self._transaction = old_transaction
                 if session:
                     session.remove()
         else:
@@ -606,9 +611,12 @@ class ResourceBase(object):
         """
         if self._session is None and self._transaction is None:
             try:
+                old_session = self._session
                 session = self._pool.get_session()
+                self._session = session
                 yield session
             finally:
+                self._session = old_session
                 if session:
                     session.remove()
         elif self._session:
@@ -741,7 +749,7 @@ class ResourceBase(object):
     def _before_update(self, rid, resource, validate):
         pass
 
-    def _addtional_update(self, session, rid, resource, updated):
+    def _addtional_update(self, session, rid, resource, before_updated, after_updated):
         pass
 
     def update(self, rid, resource, validate=True, detail=True):
@@ -787,7 +795,7 @@ class ResourceBase(object):
                         after_update = record.to_detail_dict()
                     else:
                         after_update = record.to_dict()
-                    self._addtional_update(session, rid, all_fields, after_update)
+                    self._addtional_update(session, rid, all_fields, before_update, after_update)
                 else:
                     after_update = before_update
                 return before_update, after_update
