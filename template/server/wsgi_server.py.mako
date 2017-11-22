@@ -10,7 +10,10 @@ ${pkg_name}.server.wsgi_server
 
 from __future__ import absolute_import
 
+import os
 from talos.server import base
 
 
-application = base.initialize_server('${pkg_name}', '${config_file}', conf_dir='${config_dir}')
+application = base.initialize_server('${pkg_name}',
+                                     os.environ.get('${pkg_name.upper()}_CONF', '${config_file}'),
+                                     conf_dir=os.environ.get('${pkg_name.upper()}_CONF_DIR', '${config_dir}'))
