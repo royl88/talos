@@ -8,7 +8,8 @@ import multiprocessing
 
 from talos.core import config as __config
 
-__config.setup('${config_file}', dir_path='${config_dir}')
+__config.setup(os.environ.get('${pkg_name.upper()}_CONF', '${config_file}'),
+               dir_path=os.environ.get('${pkg_name.upper()}_CONF_DIR', '${config_dir}')
 CONF = __config.CONF
 
 name = CONF.locale_app
