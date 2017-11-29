@@ -19,7 +19,7 @@ from talos.core import config
 from talos.core import exceptions
 from talos.core import utils
 from talos.core.i18n import _
-from talos.db import filters
+from talos.db import filter_wrapper
 from talos.db import pool
 from talos.db import validator
 
@@ -297,48 +297,23 @@ class ResourceBase(object):
         if session is None and transaction is None:
             self._pool = pool.POOL
 
-    def _filters_merge(self, filters, default_filters):
-        keys = set(filters.keys()) & set(default_filters.keys())
-        for key in keys:
-            val = filters[key]
-            other_val = default_filters.pop(key)
-            if isinstance(val, dict) and isinstance(other_val, dict):
-                val.update(other_val)
-            elif isinstance(val, dict) and not isinstance(other_val, dict):
-                if utils.is_list_type(other_val):
-                    val['in'] = other_val
-                else:
-                    val['eq'] = other_val
-            elif not isinstance(val, dict) and isinstance(other_val, dict):
-                if utils.is_list_type(val):
-                    other_val['in'] = val
-                else:
-                    other_val['eq'] = val
-                filters[key] = other_val
-            else:
-                nval = {}
-                if utils.is_list_type(val):
-                    nval['in'] = val
-                else:
-                    nval['eq'] = val
-                if utils.is_list_type(other_val):
-                    nval['in'] = other_val
-                else:
-                    nval['eq'] = other_val
-                filters[key] = nval
-        filters.update(default_filters)
-        return filters
-
     def _filter_hander_mapping(self):
         handlers = {
-            'INET': filters.FilterNetwork(),
-            'CIDR': filters.FilterNetwork(),
+            'INET': filter_wrapper.FilterNetwork(),
+            'CIDR': filter_wrapper.FilterNetwork(),
+            'small_integer': filter_wrapper.FilterNumber(),
+            'integer': filter_wrapper.FilterNumber(),
+            'big_integer': filter_wrapper.FilterNumber(),
+            'numeric': filter_wrapper.FilterNumber(),
+            'float': filter_wrapper.FilterNumber(),
+            'date': filter_wrapper.FilterDateTime(),
+            'datetime': filter_wrapper.FilterDateTime(),
         }
         return handlers
 
     def _get_filter_handler(self, name):
         handlers = self._filter_hander_mapping()
-        return handlers.get(name, filters.Filter())
+        return handlers.get(name, filter_wrapper.Filter())
 
     def _apply_filters(self, query, orm_meta, filters=None, orders=None):
         def _extract_column_visit_name(column):
@@ -357,10 +332,11 @@ class ResourceBase(object):
                 if func:
                     return func(query, column, value)
             return query
+
         filters = filters or {}
         orders = orders or []
         for name, value in filters.items():
-            column = self._build_column_from_field(orm_meta, name)
+            column = filter_wrapper.column_from_expression(orm_meta, name)
             if column is not None:
                 handler = self._get_filter_handler(_extract_column_visit_name(column))
                 if not isinstance(value, dict):
@@ -369,23 +345,20 @@ class ResourceBase(object):
                 else:
                     for operator, value in value.items():
                         query = _handle_filter(handler, operator, query, column, value)
-        for name in orders:
+        for field in orders:
             order = '+'
-            field = name
             if field.startswith('+'):
                 order = '+'
                 field = field[1:]
             elif field.startswith('-'):
                 order = '-'
                 field = field[1:]
-            else:
-                pass
-            column_attr = getattr(orm_meta, field, None)
-            if column_attr:
+            column = filter_wrapper.column_from_expression(orm_meta, field)
+            if column:
                 if order == '+':
-                    query = query.order_by(column_attr)
+                    query = query.order_by(column)
                 else:
-                    query = query.order_by(column_attr.desc())
+                    query = query.order_by(column.desc())
         return query
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
@@ -410,7 +383,7 @@ class ResourceBase(object):
         filters = filters or {}
         filters = copy.copy(filters)
         if not ignore_default:
-            self._filters_merge(filters, self.default_filter)
+            filter_wrapper.merge(filters, self.default_filter)
         if not ignore_default:
             orders = self.default_order if orders is None else orders
         else:
@@ -454,17 +427,6 @@ class ResourceBase(object):
             raise exceptions.CriticalError(msg=utils.format_kwstring(
                 _('primary key not match! require: %(keys)s'), keys=keys))
         return query
-
-    def _build_column_from_field(self, table, field):
-        if '.' in field:
-            cut_fields = field.split('.')
-            column = getattr(table, cut_fields.pop(0), None)
-            if column:
-                for cut_field in cut_fields:
-                    column = column[cut_field]
-        else:
-            column = getattr(table, field, None)
-        return column
 
     @classmethod
     def validate(cls, data, situation, orm_required=False, validate=True, rule=None):
