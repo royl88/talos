@@ -14,13 +14,12 @@ import logging
 import six
 from sqlalchemy import and_
 import sqlalchemy.exc
-from sqlalchemy.sql.expression import BinaryExpression
-from sqlalchemy.sql.sqltypes import _type_map
 
 from talos.core import config
 from talos.core import exceptions
 from talos.core import utils
 from talos.core.i18n import _
+from talos.db import filters
 from talos.db import pool
 from talos.db import validator
 
@@ -330,77 +329,46 @@ class ResourceBase(object):
         filters.update(default_filters)
         return filters
 
-    def _apply_filters(self, query, orm_meta, filters=None, orders=None):
-        def cast_from_python_value(column, value):
-            """
-            将python类型值转换为SQLAlchemy类型值
+    def _filter_hander_mapping(self):
+        handlers = {
+            'INET': filters.FilterNetwork(),
+            'CIDR': filters.FilterNetwork(),
+        }
+        return handlers
 
-            :param column:
-            :type column:
-            :param value:
-            :type value:
-            """
-            cast_to = _type_map.get(type(value), None)
-            if cast_to is None:
-                column = column.astext
+    def _get_filter_handler(self, name):
+        handlers = self._filter_hander_mapping()
+        return handlers.get(name, filters.Filter())
+
+    def _apply_filters(self, query, orm_meta, filters=None, orders=None):
+        def _extract_column_visit_name(column):
+            col_type = getattr(column, 'type', None)
+            if col_type:
+                return getattr(col_type, '__visit_name__', None)
+            return None
+
+        def _handle_filter(handler, op, query, column, value):
+            if op:
+                func = getattr(handler, 'op_%s' % op, None)
+                if func:
+                    return func(query, column, value)
             else:
-                column = column.astext.cast(cast_to)
-            return column
+                func = getattr(handler, 'op', None)
+                if func:
+                    return func(query, column, value)
+            return query
         filters = filters or {}
         orders = orders or []
         for name, value in filters.items():
             column = self._build_column_from_field(orm_meta, name)
             if column is not None:
-                if utils.is_list_type(value) and len(value) > 0:
-                    if isinstance(column, BinaryExpression):
-                        column = cast_from_python_value(column, value[0])
-                    query = query.filter(column.in_(value))
-                elif isinstance(value, dict):
-                    for operator, value in value.items():
-                        # list should cast from element type
-                        if operator == 'in' and len(value) > 0:
-                            if isinstance(column, BinaryExpression):
-                                column = cast_from_python_value(column, value[0])
-                            query = query.filter(column.in_(value))
-                            continue
-                        elif operator == 'nin' and len(value) > 0:
-                            if isinstance(column, BinaryExpression):
-                                column = cast_from_python_value(column, value[0])
-                            query = query.filter(column.notin_(value))
-                            continue
-                        # cast from value type
-                        if isinstance(column, BinaryExpression):
-                            column = cast_from_python_value(column, value)
-                        if operator == 'eq':
-                            query = query.filter(column == value)
-                        elif operator == 'ne':
-                            query = query.filter(column != value)
-                        elif operator == 'lt':
-                            query = query.filter(column < value)
-                        elif operator == 'lte':
-                            query = query.filter(column <= value)
-                        elif operator == 'gt':
-                            query = query.filter(column > value)
-                        elif operator == 'gte':
-                            query = query.filter(column >= value)
-                        elif operator == 'like':
-                            query = query.filter(column.like('%%%s%%' % value))
-                        elif operator == 'istarts':
-                            query = query.filter(column.like('%s%%' % value))
-                        elif operator == 'iends':
-                            query = query.filter(column.like('%%%s' % value))
-                        elif operator == 'ilike':
-                            query = query.filter(column.ilike('%%%s%%' % value))
-                        elif operator == 'starts':
-                            query = query.filter(column.ilike('%s%%' % value))
-                        elif operator == 'ends':
-                            query = query.filter(column.ilike('%%%s' % value))
-                        else:
-                            pass
+                handler = self._get_filter_handler(_extract_column_visit_name(column))
+                if not isinstance(value, dict):
+                    # op is None
+                    query = _handle_filter(handler, None, query, column, value)
                 else:
-                    if isinstance(column, BinaryExpression):
-                        column = cast_from_python_value(column, value)
-                    query = query.filter(column == value)
+                    for operator, value in value.items():
+                        query = _handle_filter(handler, operator, query, column, value)
         for name in orders:
             order = '+'
             field = name
@@ -571,7 +539,7 @@ class ResourceBase(object):
             self.update()
 
             self.delete()
-            
+
             OtherResource(transaction=session).create()
         """
         session = None
