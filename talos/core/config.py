@@ -88,7 +88,7 @@ class Config(Mapping):
 
     def __getitem__(self, key):
         """魔法函数，实现类字典访问"""
-        return self.__getattr__(key)
+        return self._opts[key]
 
     def __contains__(self, key):
         """魔法函数，实现in操作访问"""
@@ -102,6 +102,32 @@ class Config(Mapping):
     def __len__(self):
         """魔法函数，实现len访问"""
         return len(self._opts)
+
+    def iterkeys(self):
+        'D.iterkeys() -> an iterator over the keys of D'
+        return iter(self._opts)
+
+    def itervalues(self):
+        'D.itervalues() -> an iterator over the values of D'
+        for key in self._opts:
+            yield self._opts[key]
+
+    def iteritems(self):
+        'D.iteritems() -> an iterator over the (key, value) items of D'
+        for key in self._opts:
+            yield (key, self._opts[key])
+
+    def keys(self):
+        "D.keys() -> list of D's keys"
+        return list(self._opts)
+
+    def items(self):
+        "D.items() -> list of D's (key, value) pairs, as 2-tuples"
+        return [(key, self._opts[key]) for key in self._opts]
+
+    def values(self):
+        "D.values() -> list of D's values"
+        return [self._opts[key] for key in self._opts]
 
 
 class Configuration(object):
