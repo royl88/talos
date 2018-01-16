@@ -9,10 +9,10 @@ talos.db.filter_wrapper
 
 from __future__ import absolute_import
 
-
-from talos.core import utils
 from sqlalchemy.sql.expression import BinaryExpression
 from sqlalchemy.sql.sqltypes import _type_map
+
+from talos.core import utils
 
 
 def merge(filters, filters_to_merge):
@@ -66,6 +66,7 @@ def column_from_expression(table, expression):
     else:
         column = getattr(table, expression, None)
     return column
+
 
 def cast(column, value):
     """
@@ -201,6 +202,7 @@ class FilterNetwork(Filter):
     '''
     用于PG数据库， 重写IP，CIDR的范围查询，不支持like操作
     '''
+
     def op(self, query, column, value):
         if utils.is_list_type(value):
             if len(value) == 0:
@@ -267,11 +269,36 @@ class FilterNetwork(Filter):
     def op_iends(self, query, column, value):
         return query
 
+    def op_lt(self, query, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        query = query.filter(column.op("<<")(value))
+        return query
+
+    def op_lte(self, query, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        query = query.filter(column.op("<<=")(value))
+        return query
+
+    def op_gt(self, query, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        query = query.filter(column.op(">>")(value))
+        return query
+
+    def op_gte(self, query, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        query = query.filter(column.op(">>=")(value))
+        return query
+
 
 class FilterNumber(Filter):
     '''
     数字类型不支持like操作
     '''
+
     def op_like(self, query, column, value):
         return query
 
