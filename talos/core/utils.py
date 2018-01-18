@@ -24,10 +24,11 @@ class ComplexEncoder(json.JSONEncoder):
     """加强版的JSON Encoder，支持日期、日期+时间类型的转换"""
 
     def default(self, obj):
+        # fix, 不要使用strftime，当超过1900年时会报错
         if isinstance(obj, datetime.datetime):
-            return obj.strftime('%Y-%m-%d %H:%M:%S')
+            return obj.isoformat(' ').split('.')[0]
         if isinstance(obj, datetime.date):
-            return obj.strftime('%Y-%m-%d')
+            return obj.isoformat()
         return json.JSONEncoder.default(self, obj)
 
 
