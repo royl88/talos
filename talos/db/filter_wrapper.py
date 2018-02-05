@@ -88,8 +88,6 @@ def cast(column, value):
 class Filter(object):
     def op(self, query, column, value):
         if utils.is_list_type(value):
-            if len(value) == 0:
-                return query
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             query = query.filter(column.in_(value))
@@ -101,8 +99,6 @@ class Filter(object):
 
     def op_in(self, query, column, value):
         if utils.is_list_type(value):
-            if len(value) == 0:
-                return query
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             query = query.filter(column.in_(value))
@@ -114,8 +110,6 @@ class Filter(object):
 
     def op_nin(self, query, column, value):
         if utils.is_list_type(value):
-            if len(value) == 0:
-                return query
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             query = query.filter(column.notin_(value))
@@ -205,8 +199,6 @@ class FilterNetwork(Filter):
 
     def op(self, query, column, value):
         if utils.is_list_type(value):
-            if len(value) == 0:
-                return query
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             filters = column.op("<<=")(value[0])
@@ -221,8 +213,6 @@ class FilterNetwork(Filter):
 
     def op_in(self, query, column, value):
         if utils.is_list_type(value):
-            if len(value) == 0:
-                return query
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             filters = column.op("<<=")(value[0])
@@ -237,8 +227,6 @@ class FilterNetwork(Filter):
 
     def op_nin(self, query, column, value):
         if utils.is_list_type(value):
-            if len(value) == 0:
-                return query
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             filters = ~column.op("<<=")(value[0])
