@@ -2,6 +2,7 @@
 ${coding}
 from __future__ import absolute_import
 
+import os
 import logging
 from logging.handlers import WatchedFileHandler
 import multiprocessing
@@ -9,7 +10,7 @@ import multiprocessing
 from talos.core import config as __config
 
 __config.setup(os.environ.get('${pkg_name.upper()}_CONF', '${config_file}'),
-               dir_path=os.environ.get('${pkg_name.upper()}_CONF_DIR', '${config_dir}')
+               dir_path=os.environ.get('${pkg_name.upper()}_CONF_DIR', '${config_dir}'))
 CONF = __config.CONF
 
 name = CONF.locale_app
