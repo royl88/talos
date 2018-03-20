@@ -18,7 +18,7 @@ if six.PY2:
     else:
         sys.setdefaultencoding('GBK')
 else:
-    raw_input=input
+    raw_input = input
 
 
 def mkdir(dir_path):
@@ -155,10 +155,10 @@ def initialize_app(dest_path, pkg_name, app_name):
            os.path.join(app_dir, '__init__.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
     render(os.path.join(template_path, 'apps', 'app_api.py.mako'),
-           os.path.join(app_dir, app_name + '_api.py'),
+           os.path.join(app_dir, 'api.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
     render(os.path.join(template_path, 'apps', 'app_controller.py.mako'),
-           os.path.join(app_dir, app_name + '_controller.py'),
+           os.path.join(app_dir, 'controller.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
     render(os.path.join(template_path, 'apps', 'route.py.mako'),
            os.path.join(app_dir, 'route.py'),
