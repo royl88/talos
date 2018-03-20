@@ -129,6 +129,9 @@ class Config(Mapping):
         "D.values() -> list of D's values"
         return [self._opts[key] for key in self._opts]
 
+    def to_dict(self):
+        return self._opts
+
 
 class Configuration(object):
     """
