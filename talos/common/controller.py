@@ -71,7 +71,7 @@ class Controller(object):
         filter_mapping = {'contains': 'like', 'icontains': 'ilike',  # include
                           'istartswith': 'istarts', 'startswith': 'starts',
                           'iendswith': 'iends', 'endswith': 'ends',
-                          'in': 'in', 'notin': 'nin', 'notequal': 'neq', 'equal': 'eq',  # value compare
+                          'in': 'in', 'notin': 'nin', 'notequal': 'ne', 'equal': 'eq',  # value compare
                           'less': 'lt', 'lessequal': 'lte', 'greater': 'gt', 'greaterequal': 'gte'}
         filters = {}
         offset = None
