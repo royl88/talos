@@ -49,8 +49,8 @@ def input_var_with_check(prompt, rule=None, max_try=3):
 
 
 def render(template_file, output_file, **kwargs):
-    with open(template_file, 'r') as f_source:
-        with open(output_file, 'w') as f_target:
+    with open(template_file, 'rb') as f_source:
+        with open(output_file, 'wb') as f_target:
             content = Template(f_source.read()).render(**kwargs)
             f_target.write(content)
 
