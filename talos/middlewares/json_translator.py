@@ -29,21 +29,17 @@ class JSONTranslator(object):
             # Nothing to do
             return
 
-        if hasattr(req, 'media'):
-            # falcon.version >= 1.3.0
-            req.json = req.media
-        else:
-            # falcon.version <= 1.2.0
-            body = req.stream.read()
-            if not body:
-                raise exceptions.BodyParseError(msg=_('empty request body, a valid json document is required.'))
-            try:
-                body = body.decode('utf-8')
-                LOG.debug("request body: %s", body)
-                req.json = json.loads(body)
-            except (ValueError, UnicodeDecodeError):
-                raise exceptions.BodyParseError(
-                    msg=_('malformed json, body was incorrect or not encoded as UTF-8.'))
+        # 修复falcon重复读取导致无法解析json问题，因此不再使用media
+        body = req.stream.read()
+        if not body:
+            raise exceptions.BodyParseError(msg=_('empty request body, a valid json document is required.'))
+        try:
+            body = body.decode('utf-8')
+            LOG.debug("request body: %s", body)
+            req.json = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            raise exceptions.BodyParseError(
+                msg=_('malformed json, body was incorrect or not encoded as UTF-8.'))
 
     def process_response(self, req, resp, resource):
         """在业务逻辑之后，对每个请求返回数据格式化为json"""
