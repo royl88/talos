@@ -57,7 +57,7 @@ class Controller(object):
             return False
 
         query_dict = {}
-        reg = re.compile('^(.+)\[(\d+)\]$')
+        reg = re.compile('^(.+)\[(\d+)?\]$')
         for key, value in req.params.items():
             matches = reg.match(key)
             if matches:
@@ -68,6 +68,14 @@ class Controller(object):
                     query_dict[match_key] = [value]
             else:
                 query_dict[key] = value
+        # 移除[]后缀,兼容js数组形态查询
+        strip_query_dict = {}
+        for key, value in query_dict.items():
+            if key.endswith('[]'):
+                strip_query_dict[key[:-2]] = value
+            else:
+                strip_query_dict[key] = value
+        query_dict = strip_query_dict
         filter_mapping = {'contains': 'like', 'icontains': 'ilike',  # include
                           'istartswith': 'istarts', 'startswith': 'starts',
                           'iendswith': 'iends', 'endswith': 'ends',
