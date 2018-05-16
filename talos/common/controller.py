@@ -109,7 +109,7 @@ class Controller(object):
                     comparator = filter_mapping.get(comparator, None)
                     if comparator:
                         if base_key in filters and isinstance(filters[base_key], dict):
-                            filters[base_key] = {comparator: query_dict[key]}
+                            filters[base_key].update({comparator: query_dict[key]})
                         else:
                             filters[base_key] = {comparator: query_dict[key]}
                 continue
@@ -121,7 +121,7 @@ class Controller(object):
                 comparator = filter_mapping.get(comparator, None)
                 if comparator and _glob_match(supported_filters, base_key):
                     if base_key in filters and isinstance(filters[base_key], dict):
-                        filters[base_key][comparator] = query_dict[key]
+                        filters[base_key].update({comparator: query_dict[key]})
                     else:
                         filters[base_key] = {comparator: query_dict[key]}
         return {'filters': filters, 'offset': offset, 'limit': limit, 'orders': orders}
