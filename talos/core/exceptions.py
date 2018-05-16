@@ -18,6 +18,7 @@ class Error(Exception):
             self.message = message
         else:
             self._build_message(self.message_format, **kwargs)
+        super(Error, self).__init__(message, **kwargs)
 
     def _build_message(self, message, **kwargs):
         self.message = self.message_format % kwargs
