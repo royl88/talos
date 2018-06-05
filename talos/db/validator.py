@@ -122,7 +122,7 @@ class NumberValidator(NullValidator):
             if self.range_min is not None and self.range_min > value:
                 return _('number range min required > %(min)d') % {'min': self.range_min}
             if self.range_max is not None and self.range_max < value:
-                return _('number range max required < %(max)d') % {'min': self.range_max}
+                return _('number range max required < %(max)d') % {'max': self.range_max}
             return True
         return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join(self.types)}
 
