@@ -28,6 +28,8 @@ class RegexValidator(NullValidator):
         self.flags = re.IGNORECASE if ignore_case else 0
 
     def validate(self, value):
+        if not utils.is_string_type(value):
+            return _('regex validator need string input, not %(type)s') % {'type': type(value).__name__}
         if re.match(self.templ, value, self.flags) is not None:
             return True
         return _('regex match error,regex: %(rule)s, value: %(value)s') % {'rule': self.templ, 'value': value}
@@ -92,6 +94,10 @@ class LengthValidator(NullValidator):
         self.maximum = maximum
 
     def validate(self, value):
+        try:
+            len(value)
+        except TypeError:
+            return _('object of type %(type)s has no length') % {'type': type(value).__name__}
         if self.minimum <= len(value) and len(value) <= self.maximum:
             return True
         return _('length required: %(min)d <= %(value)d <= %(max)d') % {'min': self.minimum, 'value': len(value), 'max': self.maximum}
