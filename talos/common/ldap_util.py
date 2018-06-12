@@ -1,7 +1,7 @@
 # coding=utf-8
 """
-makaira.common.ldap
-~~~~~~~~~~~~~~~~~~~
+talos.common.ldap
+~~~~~~~~~~~~~~~~~
 
 本模块提供AD功能集成
 
@@ -9,7 +9,6 @@ makaira.common.ldap
 
 from __future__ import absolute_import
 
-import json
 import logging
 
 
@@ -21,8 +20,7 @@ except:
     pass
 
 
-# LOG = logging.getLogger(__name__)
-LOG = logging
+LOG = logging.getLogger(__name__)
 
 AD_PORT_SSL = 636
 AD_PORT = 389
