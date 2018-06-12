@@ -682,7 +682,7 @@ class ResourceBase(object):
     def _addtional_update(self, session, rid, resource, before_updated, after_updated):
         pass
 
-    def update(self, rid, resource, validate=True, detail=True):
+    def update(self, rid, resource, filters=None, validate=True, detail=True):
         """
         更新资源
 
@@ -705,6 +705,8 @@ class ResourceBase(object):
             try:
                 query = self._get_query(session)
                 query = self._apply_primary_key_filter(query, rid)
+                if filters:
+                    query = self._apply_filters(query, self.orm_meta, filters)
                 record = query.one_or_none()
                 before_update = None
                 after_update = None
@@ -743,7 +745,7 @@ class ResourceBase(object):
     def _addtional_delete(self, session, resource):
         pass
 
-    def delete(self, rid):
+    def delete(self, rid, filters=None):
         """
         删除资源
 
@@ -757,6 +759,8 @@ class ResourceBase(object):
             try:
                 query = self._get_query(session, orders=[])
                 query = self._apply_primary_key_filter(query, rid)
+                if filters:
+                    query = self._apply_filters(query, self.orm_meta, filters)
                 record = query.one_or_none()
                 resource = None
                 count = 0
