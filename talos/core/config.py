@@ -182,6 +182,8 @@ CONFIG_OPTS = {
     'language': 'en',
     'locale_app': UNSET,
     'locale_path': UNSET,
+    'global_list_size_limit_enabled': False,
+    'global_list_size_limit': None,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
