@@ -25,6 +25,7 @@ CONF = config.CONF
 class Controller(object):
     name = None
     resource = None
+    list_size_limit = None
     allow_methods = tuple()
 
     def _validate_method(self, req):
@@ -180,6 +181,13 @@ class CollectionController(Controller):
         :returns: 符合条件的资源
         :rtype: list
         """
+        # 如果用户没有设置limit并且程序中自带了size limit则使用默认limit值
+        # 若都没有设置，则检测全局配置是否启用并设置
+        if 'limit' not in criteria:
+            if self.list_size_limit is not None:
+                criteria['limit'] = self.list_size_limit
+            elif CONF.global_list_size_limit_enabled and CONF.global_list_size_limit is not None:
+                criteria['limit'] = CONF.global_list_size_limit
         return self.make_resource(req).list(**criteria)
 
     def on_post(self, req, resp, **kwargs):
