@@ -282,3 +282,21 @@ def ensure_bytes(value):
         else:
             return value
     raise ValueError('can not convert to bytes')
+
+
+def get_config(conf, expr, default=None):
+    '''
+    配置获取辅助函数
+    :param conf: CONF对象
+    :param expr: 路径表达式，eg. log.path
+    :param default: 如果不存在，则使用默认default值
+    '''
+    names = expr.split('.')
+    result = conf
+    for name in names:
+        try:
+            result = getattr(result, name)
+        except AttributeError:
+            result = default
+            break
+    return result
