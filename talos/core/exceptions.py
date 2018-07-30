@@ -17,10 +17,10 @@ class Error(Exception):
         if message:
             self.message = message
         else:
-            self._build_message(self.message_format, **kwargs)
-        super(Error, self).__init__(message, **kwargs)
+            self._build_message(**kwargs)
+        super(Error, self).__init__(self.message)
 
-    def _build_message(self, message, **kwargs):
+    def _build_message(self, **kwargs):
         self.message = self.message_format % kwargs
 
     def __str__(self):
