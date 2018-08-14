@@ -557,7 +557,7 @@ class ResourceBase(object):
     def _addtional_count(self, query, filters):
         return query
 
-    def count(self, filters=None, offset=None, limit=None):
+    def count(self, filters=None, offset=None, limit=None, hooks=None):
         """
         获取符合条件的记录数量
 
@@ -567,12 +567,17 @@ class ResourceBase(object):
         :type offset: int
         :param limit: 数量限制
         :type limit: int
+        :param hooks: 钩子函数列表，函数形式为func(query, filters)
+        :type hooks: list
         :returns: 数量
         :rtype: int
         """
         offset = offset or 0
         with self.get_session() as session:
             query = self._get_query(session, filters=filters, orders=[])
+            if hooks:
+                for h in hooks:
+                    query = h(query, filters)
             query = self._addtional_count(query, filters=filters)
             if offset:
                 query = query.offset(offset)
@@ -583,7 +588,7 @@ class ResourceBase(object):
     def _addtional_list(self, query, filters):
         return query
 
-    def list(self, filters=None, orders=None, offset=None, limit=None):
+    def list(self, filters=None, orders=None, offset=None, limit=None, hooks=None):
         """
         获取符合条件的记录
 
@@ -595,12 +600,17 @@ class ResourceBase(object):
         :type offset: int
         :param limit: 数量限制
         :type limit: int
+        :param hooks: 钩子函数列表，函数形式为func(query, filters)
+        :type hooks: list
         :returns: 记录列表
         :rtype: list
         """
         offset = offset or 0
         with self.get_session() as session:
             query = self._get_query(session, filters=filters, orders=orders)
+            if hooks:
+                for h in hooks:
+                    query = h(query, filters)
             query = self._addtional_list(query, filters)
             if offset:
                 query = query.offset(offset)
