@@ -101,7 +101,7 @@ class Filter(object):
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
-            query = query.filter(column.in_(value))
+            query = query.filter(column.in_(tuple(value)))
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
@@ -112,7 +112,7 @@ class Filter(object):
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
-            query = query.filter(column.in_(value))
+            query = query.filter(column.in_(tuple(value)))
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
@@ -123,7 +123,7 @@ class Filter(object):
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
-            query = query.filter(column.notin_(value))
+            query = query.filter(column.notin_(tuple(value)))
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
