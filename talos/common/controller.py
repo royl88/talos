@@ -58,7 +58,7 @@ class Controller(object):
             return False
 
         query_dict = {}
-        reg = re.compile('^(.+)\[(\d+)?\]$')
+        reg = re.compile('^(.+)\[(\d+)\]$')
         for key, value in req.params.items():
             matches = reg.match(key)
             if matches:
