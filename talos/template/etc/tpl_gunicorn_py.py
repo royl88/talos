@@ -1,5 +1,9 @@
 # coding=utf-8
+
+TEMPLATE = '''
+# coding=utf-8
 ${coding}
+
 from __future__ import absolute_import
 
 import os
@@ -55,3 +59,4 @@ access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(L)s %(b)s "%(f)s" "
 # syslog_addr = udp://localhost:514
 # HTTP URL长度限制
 # limit_request_line = 4094
+'''

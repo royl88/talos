@@ -1,8 +1,11 @@
 # coding=utf-8
+
+TEMPLATE = '''
+# coding=utf-8
 ${coding}
 """
 ${pkg_name}.server.simple_server
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 本模块提供开发测试用的简单服务启动能力
 
@@ -32,3 +35,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+'''

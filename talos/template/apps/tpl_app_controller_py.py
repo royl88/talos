@@ -1,4 +1,7 @@
 # coding=utf-8
+
+TEMPLATE = '''
+# coding=utf-8
 ${coding}
 
 from __future__ import absolute_import
@@ -16,3 +19,4 @@ class Collection${app_name.upper()}(CollectionController):
 class Item${app_name.upper()}(ItemController):
     name = '${pkg_name}.${app_name}'
     resource = ${app_name}_api.Resource
+'''

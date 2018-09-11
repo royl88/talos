@@ -1,6 +1,9 @@
+# coding=utf-8
+
+TEMPLATE = '''
 # Project Translate.
-# Copyright (C) 2017 Roy
-# Roy <wjjroy@outlook.com>, 2017.
+# Copyright (C) 2017 AutoGen
+# AutoGen <AutoGen@sample.com>, 2017.
 #
 msgid ""
 msgstr ""
@@ -16,3 +19,4 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: pygettext.py 1.5\n"
 "X-Generator: Poedit 2.0.3\n"
+'''

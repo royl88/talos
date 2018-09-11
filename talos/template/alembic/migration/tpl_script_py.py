@@ -1,3 +1,9 @@
+# coding=utf-8
+
+TEMPLATE = '''
+# coding=utf-8
+${coding}
+
 """${message}
 
 Revision ID: ${up_revision}
@@ -22,3 +28,4 @@ def upgrade():
 
 def downgrade():
     ${downgrades if downgrades else "pass"}
+'''

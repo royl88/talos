@@ -1,3 +1,6 @@
+# coding=utf-8
+
+TEMPLATE = '''
 {
     "public_endpoint": "http://www.${pkg_name}.cn/",
     "locale_app": "${pkg_name}",
@@ -32,3 +35,4 @@
         "global_limits": null
     }
 }
+'''

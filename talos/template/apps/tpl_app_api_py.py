@@ -1,4 +1,7 @@
 # coding=utf-8
+
+TEMPLATE = '''
+# coding=utf-8
 ${coding}
 
 from __future__ import absolute_import
@@ -25,5 +28,4 @@ class Resource(object):
 
     def delete(self, rid):
         return 0, None
-    
-    
+'''
