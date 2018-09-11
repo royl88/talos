@@ -28,10 +28,6 @@ def mkdir(dir_path):
         pass
 
 
-if platform.system() == 'Linux':
-    template_path = '/usr/local/talos_template'
-else:
-    template_path = os.path.join(os.path.expanduser('~'), 'talos_template')
 PYTHON_CODING = '# coding=utf-8'
 DEFAULT_VAR_RULE = r'^[a-zA-Z][_a-zA-Z0-9]*$'
 
@@ -48,36 +44,42 @@ def input_var_with_check(prompt, rule=None, max_try=3):
     return content
 
 
-def render(template_file, output_file, **kwargs):
-    with open(template_file, 'rb') as f_source:
-        with open(output_file, 'w') as f_target:
-            content = Template(f_source.read()).render(**kwargs)
-            f_target.write(content)
+def render(source_code, output_file, **kwargs):
+    with open(output_file, 'w') as f_target:
+        content = Template(source_code).render(**kwargs)
+        f_target.write(content)
+
+
+def get_template(name):
+    __import__('talos.template.' + name)
+    mod = sys.modules[name]
+    return mod.TEMPLATE
 
 
 def initialize_package(dest_path, pkg_name, author, author_email, version):
     src_dir = os.path.join(dest_path, pkg_name)
     mkdir(src_dir)
-    shutil.copyfile(os.path.join(template_path, '__init__.py.mako'),
-                    os.path.join(src_dir, '__init__.py'))
-    render(os.path.join(template_path, 'LICENSE.mako'),
+    render(get_template('tpl_init_py'),
+           os.path.join(dest_path, '__init__.py'),
+           author=author, coding=PYTHON_CODING)
+    render(get_template('tpl_LICENSE'),
            os.path.join(dest_path, 'LICENSE'),
            author=author)
-    render(os.path.join(template_path, 'MANIFEST.in.mako'),
+    render(get_template('tpl_MANIFEST_in'),
            os.path.join(dest_path, 'MANIFEST.in'))
-    render(os.path.join(template_path, 'README.md.mako'),
+    render(get_template('tpl_README_md'),
            os.path.join(dest_path, 'README.md'))
-    render(os.path.join(template_path, 'requirements.txt.mako'),
+    render(get_template('tpl_requirements_txt'),
            os.path.join(dest_path, 'requirements.txt'))
-    render(os.path.join(template_path, 'setup.cfg.mako'),
+    render(get_template('tpl_setup_cfg'),
            os.path.join(dest_path, 'setup.cfg'),
            pkg_name=pkg_name, author=author, author_email=author_email)
-    render(os.path.join(template_path, 'setup.py.mako'),
+    render(get_template('tpl_setup_py'),
            os.path.join(dest_path, 'setup.py'),
            pkg_name=pkg_name, author=author, author_email=author_email, coding=PYTHON_CODING)
-    render(os.path.join(template_path, 'tox.ini.mako'),
+    render(get_template('tpl_tox_ini'),
            os.path.join(dest_path, 'tox.ini'))
-    render(os.path.join(template_path, 'VERSION.mako'),
+    render(get_template('tpl_VERSION'),
            os.path.join(dest_path, 'VERSION'),
            version=version)
 
@@ -85,13 +87,17 @@ def initialize_package(dest_path, pkg_name, author, author_email, version):
 def initialize_server(dest_path, pkg_name, config_file, config_dir):
     server_dir = os.path.join(dest_path, pkg_name, 'server')
     mkdir(server_dir)
-    shutil.copyfile(os.path.join(template_path, 'server', '__init__.py'),
-                    os.path.join(server_dir, '__init__.py'))
-    render(os.path.join(template_path, 'server', 'simple_server.py.mako'),
+    render(get_template('server.tpl_init_py'),
+           os.path.join(server_dir, '__init__.py'),
+           coding=PYTHON_CODING)
+    render(get_template('server.tpl_simple_server_py'),
            os.path.join(server_dir, 'simple_server.py'),
            pkg_name=pkg_name, coding=PYTHON_CODING)
-    render(os.path.join(template_path, 'server', 'wsgi_server.py.mako'),
+    render(get_template('server.tpl_wsgi_server_py'),
            os.path.join(server_dir, 'wsgi_server.py'),
+           pkg_name=pkg_name, config_file=config_file, config_dir=config_dir, coding=PYTHON_CODING)
+    render(get_template('server.tpl_celery_worker_py'),
+           os.path.join(server_dir, 'celery_worker.py'),
            pkg_name=pkg_name, config_file=config_file, config_dir=config_dir, coding=PYTHON_CODING)
 
 
@@ -100,14 +106,13 @@ def initialize_etc(dest_path, pkg_name, config_file, config_dir, db_connection):
     mkdir(etc_dir)
     locale_dir = os.path.join(dest_path, 'etc', 'locale', 'en', 'LC_MESSAGES')
     mkdir(locale_dir)
-    shutil.copyfile(os.path.join(template_path, 'etc', 'locale', 'en', 'LC_MESSAGES', 'project.po'),
-                    os.path.join(locale_dir, pkg_name + '.po'))
-    shutil.copyfile(os.path.join(template_path, 'etc', 'locale', 'en', 'LC_MESSAGES', 'project.mo'),
-                    os.path.join(locale_dir, pkg_name + '.mo'))
-    render(os.path.join(template_path, 'etc', 'gunicorn.py.mako'),
+
+    render(get_template('etc.locale.en.LC_MESSAGES.tpl_project_po'),
+           os.path.join(locale_dir, pkg_name + '.po'))
+    render(get_template('etc.tpl_gunicorn_py'),
            os.path.join(etc_dir, 'gunicorn.py'),
            pkg_name=pkg_name, config_file=config_file, config_dir=config_dir, coding=PYTHON_CODING)
-    render(os.path.join(template_path, 'etc', 'project.conf.mako'),
+    render(get_template('etc.tpl_project_conf'),
            os.path.join(etc_dir, pkg_name + '.conf'),
            pkg_name=pkg_name, db_connection=db_connection)
 
@@ -117,50 +122,57 @@ def initialize_alembic(dest_path, pkg_name, db_connection):
     mkdir(alembic_dir)
     migration_dir = os.path.join(dest_path, 'alembic', 'migration')
     mkdir(migration_dir)
-    render(os.path.join(template_path, 'alembic', 'alembic.ini.mako'),
+
+    render(get_template('alembic.tpl_alembic_ini'),
            os.path.join(alembic_dir, 'alembic.ini'),
            db_connection=db_connection)
-    render(os.path.join(template_path, 'alembic', 'migration', 'env.py.mako'),
+    render(get_template('alembic.migration.tpl_env_py'),
            os.path.join(migration_dir, 'env.py'),
-           pkg_name=pkg_name)
-    shutil.copyfile(os.path.join(template_path, 'alembic', 'migration', 'README'),
-                    os.path.join(migration_dir, 'README'))
-    shutil.copyfile(os.path.join(template_path, 'alembic', 'migration', 'script.py.mako'),
-                    os.path.join(migration_dir, 'script.py.mako'))
+           pkg_name=pkg_name, coding=PYTHON_CODING)
+    render(get_template('alembic.migration.tpl_README'),
+           os.path.join(migration_dir, 'README'),
+           pkg_name=pkg_name, coding=PYTHON_CODING)
+    render(get_template('alembic.migration.tpl_script_py'),
+           os.path.join(migration_dir, 'script.py.mako'),
+           pkg_name=pkg_name, coding=PYTHON_CODING)
 
 
 def initialize_middlewares(dest_path, pkg_name):
     middlewares_dir = os.path.join(dest_path, pkg_name, 'middlewares')
     mkdir(middlewares_dir)
-    shutil.copyfile(os.path.join(template_path, 'middlewares', '__init__.py'),
-                    os.path.join(middlewares_dir, '__init__.py'))
+    render(get_template('middlewares.tpl_init_py'),
+           os.path.join(middlewares_dir, '__init__.py'),
+           coding=PYTHON_CODING)
 
 
 def initialize_database(dest_path, pkg_name):
     db_dir = os.path.join(dest_path, pkg_name, 'db')
     mkdir(db_dir)
-    shutil.copyfile(os.path.join(template_path, 'db', '__init__.py'),
-                    os.path.join(db_dir, '__init__.py'))
-    shutil.copyfile(os.path.join(template_path, 'db', 'models.py'),
-                    os.path.join(db_dir, 'models.py'))
+    render(get_template('db.tpl_init_py'),
+           os.path.join(db_dir, '__init__.py'),
+           coding=PYTHON_CODING)
+    render(get_template('db.tpl_models_py'),
+           os.path.join(db_dir, 'models.py'),
+           coding=PYTHON_CODING)
 
 
 def initialize_app(dest_path, pkg_name, app_name):
     if not os.path.exists(os.path.join(dest_path, '__init__.py')):
-        shutil.copyfile(os.path.join(template_path, '__init__.py.mako'),
-                        os.path.join(dest_path, '__init__.py'))
+        render(get_template('tpl_init_py'),
+               os.path.join(dest_path, '__init__.py'),
+               coding=PYTHON_CODING)
     app_dir = os.path.join(dest_path, app_name)
     mkdir(app_dir)
-    render(os.path.join(template_path, 'apps', '__init__.py.mako'),
+    render(get_template('apps.tpl_init_py'),
            os.path.join(app_dir, '__init__.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
-    render(os.path.join(template_path, 'apps', 'app_api.py.mako'),
+    render(get_template('apps.tpl_app_api_py'),
            os.path.join(app_dir, 'api.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
-    render(os.path.join(template_path, 'apps', 'app_controller.py.mako'),
+    render(get_template('apps.tpl_app_controller_py'),
            os.path.join(app_dir, 'controller.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
-    render(os.path.join(template_path, 'apps', 'route.py.mako'),
+    render(get_template('apps.tpl_route_py'),
            os.path.join(app_dir, 'route.py'),
            pkg_name=pkg_name, app_name=app_name, coding=PYTHON_CODING)
 
