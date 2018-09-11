@@ -51,8 +51,9 @@ def render(source_code, output_file, **kwargs):
 
 
 def get_template(name):
-    __import__('talos.template.' + name)
-    mod = sys.modules[name]
+    mod_name = 'talos.template.' + name
+    __import__(mod_name)
+    mod = sys.modules[mod_name]
     return mod.TEMPLATE
 
 

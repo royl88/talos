@@ -24,24 +24,6 @@ with open(path.join(here, 'requirements.txt'), encoding='utf-8') as f:
     requirements = [line.strip()
                     for line in f if line.strip() and not line.strip().startswith('--') and not line.strip().startswith('#')]
 
-
-if platform.system() == 'Linux':
-    template_path = '/usr/local/talos_template'
-else:
-    template_path = path.join(path.expanduser('~'), 'talos_template')
-
-
-def copy_template():
-    def rmdir(dir_path):
-        try:
-            shutil.rmtree(dir_path)
-        except:
-            pass
-    rmdir(template_path)
-    shutil.copytree('./template', template_path)
-
-
-copy_template()
 data_files = []
 
 cmdclass = {}
