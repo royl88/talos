@@ -85,6 +85,8 @@ def initialize_package(dest_path, pkg_name, author, author_email, version):
 
 
 def initialize_server(dest_path, pkg_name, config_file, config_dir):
+    config_file_fixed = config_file.replace('\\', '/')
+    config_dir_fixed = config_dir.replace('\\', '/')
     server_dir = os.path.join(dest_path, pkg_name, 'server')
     mkdir(server_dir)
     render(get_template('server.tpl_init_py'),
@@ -95,10 +97,10 @@ def initialize_server(dest_path, pkg_name, config_file, config_dir):
            pkg_name=pkg_name, coding=PYTHON_CODING)
     render(get_template('server.tpl_wsgi_server_py'),
            os.path.join(server_dir, 'wsgi_server.py'),
-           pkg_name=pkg_name, config_file=config_file, config_dir=config_dir, coding=PYTHON_CODING)
+           pkg_name=pkg_name, config_file=config_file_fixed, config_dir=config_dir_fixed, coding=PYTHON_CODING)
     render(get_template('server.tpl_celery_worker_py'),
            os.path.join(server_dir, 'celery_worker.py'),
-           pkg_name=pkg_name, config_file=config_file, config_dir=config_dir, coding=PYTHON_CODING)
+           pkg_name=pkg_name, config_file=config_file_fixed, config_dir=config_dir_fixed, coding=PYTHON_CODING)
 
 
 def initialize_etc(dest_path, pkg_name, config_file, config_dir, db_connection):
