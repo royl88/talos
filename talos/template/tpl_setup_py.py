@@ -1,4 +1,7 @@
 # coding=utf-8
+
+TEMPLATE = '''
+# coding=utf-8
 ${coding}
 
 # Always prefer setuptools over distutils
@@ -123,3 +126,4 @@ setup(
         ],
     },
 )
+'''

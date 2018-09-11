@@ -1,3 +1,6 @@
+# coding=utf-8
+
+TEMPLATE = '''
 # A generic, single database configuration.
 
 [alembic]
@@ -66,3 +69,4 @@ formatter = generic
 [formatter_generic]
 format = %(levelname)-5.5s [%(name)s] %(message)s
 datefmt = %H:%M:%S
+'''

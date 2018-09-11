@@ -1,5 +1,9 @@
 # coding=utf-8
 
+TEMPLATE = '''
+# coding=utf-8
+${coding}
+
 from __future__ import absolute_import
 
 from talos.db.dictbase import DictBase
@@ -74,3 +78,4 @@ from talos.db.dictbase import DictBase
 #     id = Column(String(32), primary_key=True)
 #     name = Column(String(64))
 #     email = Column(String(64))
+'''
