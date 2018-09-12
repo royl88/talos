@@ -1,7 +1,6 @@
 # coding=utf-8
 
-TEMPLATE = '''
-# A generic, single database configuration.
+TEMPLATE = '''# A generic, single database configuration.
 
 [alembic]
 # path to migration scripts
