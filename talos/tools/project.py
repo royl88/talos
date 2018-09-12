@@ -46,7 +46,7 @@ def input_var_with_check(prompt, rule=None, max_try=3):
 
 def render(source_code, output_file, **kwargs):
     with open(output_file, 'w') as f_target:
-        content = Template(source_code).render(**kwargs)
+        content = Template(source_code, output_encoding='utf-8').render(**kwargs)
         f_target.write(content)
 
 
@@ -54,7 +54,7 @@ def get_template(name):
     mod_name = 'talos.template.' + name
     __import__(mod_name)
     mod = sys.modules[mod_name]
-    return mod.TEMPLATE
+    return mod.TEMPLATE.decode('utf-8')
 
 
 def initialize_package(dest_path, pkg_name, author, author_email, version):

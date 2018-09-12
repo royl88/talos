@@ -1,8 +1,6 @@
 # coding=utf-8
 
-TEMPLATE = '''
-# coding=utf-8
-${coding}
+TEMPLATE = '''# coding=utf-8
 """
 ${pkg_name}.server.simple_server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
