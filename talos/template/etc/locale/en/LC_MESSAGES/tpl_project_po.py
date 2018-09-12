@@ -1,6 +1,6 @@
 # coding=utf-8
 
-TEMPLATE = '''# Project Translate.
+TEMPLATE = u'''# Project Translate.
 # Copyright (C) 2017 AutoGen
 # AutoGen <AutoGen@sample.com>, 2017.
 #

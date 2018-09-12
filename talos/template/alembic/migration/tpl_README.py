@@ -1,4 +1,4 @@
 # coding=utf-8
 
-TEMPLATE = '''Generic single-database configuration.
+TEMPLATE = u'''Generic single-database configuration.
 '''

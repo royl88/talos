@@ -1,6 +1,6 @@
 # coding=utf-8
 
-TEMPLATE = '''# coding=utf-8
+TEMPLATE = u'''# coding=utf-8
 """
 ${pkg_name}.server.wsgi_server
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
