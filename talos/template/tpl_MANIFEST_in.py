@@ -1,6 +1,6 @@
 # coding=utf-8
 
-TEMPLATE = '''# Include the license file
+TEMPLATE = u'''# Include the license file
 include LICENSE
 include README.md
 include VERSION
