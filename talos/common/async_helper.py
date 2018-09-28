@@ -7,8 +7,8 @@ import logging
 
 from falcon.routing import util
 
-from fitportal.common import celery
-from fitportal.utils import http
+from talos.common import celery
+from talos.utils import http
 
 
 LOG = logging.getLogger(__name__)

@@ -35,6 +35,24 @@ class Error(Exception):
         return None
 
 
+class CallBackError(Error):
+    """接收并转换Restful错误异常"""
+
+    def __init__(self, message):
+        self._message = message
+        if isinstance(message, dict):
+            self.message = message.get('description', 'Unknown')
+            self.code = message.get('code', 500)
+        Exception.__init__(self, message)
+
+    @property
+    def title(self):
+        return self._message.get('title', 'Unknown')
+
+    def __str__(self):
+        return self._message.get('description', 'Unknown')
+
+
 class CriticalError(Error):
     """重大错误异常"""
     code = 500
