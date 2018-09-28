@@ -47,10 +47,16 @@ class CallBackError(Error):
 
     @property
     def title(self):
-        return self._message.get('title', 'Unknown')
+        if isinstance(self._message, dict):
+            return self._message.get('title', 'Unknown')
+        else:
+            return self._message
 
     def __str__(self):
-        return self._message.get('description', 'Unknown')
+        if isinstance(self._message, dict):
+            return self._message.get('description', 'Unknown')
+        else:
+            return self._message
 
 
 class CriticalError(Error):
