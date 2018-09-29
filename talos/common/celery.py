@@ -27,9 +27,9 @@
 1. 建立workers.app_name.task.py用于编写远程任务
 2. 建立workers.app_name.callback.py用于编写远程回调
 3. task.py任务示例
-import async_helper
-import celery
-import callback
+from talos.common import celery
+from talos.common import async_helper
+from project_name.workers.app_name import callback
 @celery.app.task
 def add(task_id, x, y):
     result = x + y
@@ -44,13 +44,16 @@ def add(task_id, x, y):
     return result
 
 4. callback.py回调示例
-import async_helper
+from talos.common import async_helper
 # 可以使用函数参数中的任意变量作为url的变量（为了某种情况下作为url区分），当然也可以不用
 @async_helper.callback('/callback/add/{task_id}')
 def callback_add(result, task_id, request=None, response=None):
     db.save(task_id, result)
 
 5. route中添加回调
+from talos.common import async_helper
+from project_name.workers.app_name import callback
+
 async_helper.add_callback_route(api, callback.callback_add)
 
 6. 启动worker

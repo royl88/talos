@@ -61,7 +61,7 @@ def initialize_package(dest_path, pkg_name, author, author_email, version):
     src_dir = os.path.join(dest_path, pkg_name)
     mkdir(src_dir)
     render(get_template('tpl_init_py'),
-           os.path.join(dest_path, '__init__.py'),
+           os.path.join(src_dir, '__init__.py'),
            author=author, coding=PYTHON_CODING)
     render(get_template('tpl_LICENSE'),
            os.path.join(dest_path, 'LICENSE'),
