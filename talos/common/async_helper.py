@@ -9,9 +9,13 @@ from falcon.routing import util
 
 from talos.common import celery
 from talos.utils import http
+from talos.core import config
+from talos.core import utils as talos_util
+from talos.core import exceptions
 
 
 LOG = logging.getLogger(__name__)
+CONF = config.CONF
 
 
 class CallbackController(object):
@@ -25,11 +29,39 @@ class CallbackController(object):
         ref = self.func(data=data, request=req, response=resp, **kwargs)
 
 
-def callback(url, method='POST'):
+def callback(url, name=None, method='POST'):
     def _wraps(func):
+        def _get_ipaddr(request, strict):
+            if strict:
+                return request.remote_addr
+            else:
+                return request.access_route[0]
+
+        def _merge_hosts(g_hosts, n_hosts):
+            allow_hosts = None
+            if g_hosts is None:
+                if n_hosts is None:
+                    allow_hosts = None
+                else:
+                    allow_hosts = list(n_hosts[:])
+            else:
+                allow_hosts = list(g_hosts[:])
+                if n_hosts is not None:
+                    allow_hosts.extend(n_hosts[:])
+            if allow_hosts is not None:
+                return set(allow_hosts)
+
         @functools.wraps(func)
-        def __wraps(*args, **kwargs):
-            return func(*args, **kwargs)
+        def __wraps(req, resp, **kwargs):
+            strict_client = talos_util.get_config(CONF, 'worker.callback.strict_client', True)
+            global_allow_hosts = talos_util.get_config(CONF, 'worker.callback.allow_hosts', None)
+            if name:
+                name_allow_hosts = talos_util.get_config(CONF, 'worker.callback.name.%s.allow_hosts' % name, None)
+            allow_hosts = _merge_hosts(global_allow_hosts, name_allow_hosts)
+            cur_client = _get_ipaddr(req, strict_client)
+            if allow_hosts is not None and cur_client not in allow_hosts:
+                raise exceptions.ForbiddenError()
+            return func(req, resp, **kwargs)
         __wraps.__url = url
         __wraps.__method = method
         return __wraps
@@ -42,7 +74,7 @@ def add_callback_route(api, func):
     api.add_route(url, CallbackController(func, method))
 
 
-def send_callback(url_base, func, data, **kwargs):
+def send_callback(url_base, func, data, timeout=3, **kwargs):
     url = func.__url
     method = func.__method.lower()
     vars, pattern = util.compile_uri_template(url)
@@ -51,7 +83,7 @@ def send_callback(url_base, func, data, **kwargs):
     url = url_base + url
     http_method = getattr(http.RestfulJson, method, None)
     LOG.debug('######## worker callback %s %s, data: %s', method, url, data)
-    result = http_method(url, json=data)
+    result = http_method(url, json=data, timeout=timeout)
     return result
 
 
