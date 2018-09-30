@@ -21,6 +21,12 @@
                                         "exchange": "your_exchange_name",
                                         "routing_key": "your_routing_name"}
             }
+        },
+        "worker": {
+            "callback": {
+                "strict_client": true,
+                "allow_hosts": ["127.0.0.1"]
+            }
         }
 
 使用方式：

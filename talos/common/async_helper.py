@@ -52,16 +52,15 @@ def callback(url, name=None, method='POST'):
                 return set(allow_hosts)
 
         @functools.wraps(func)
-        def __wraps(req, resp, **kwargs):
+        def __wraps(data, request, response, **kwargs):
             strict_client = talos_util.get_config(CONF, 'worker.callback.strict_client', True)
             global_allow_hosts = talos_util.get_config(CONF, 'worker.callback.allow_hosts', None)
-            if name:
-                name_allow_hosts = talos_util.get_config(CONF, 'worker.callback.name.%s.allow_hosts' % name, None)
+            name_allow_hosts = talos_util.get_config(CONF, 'worker.callback.name.%s.allow_hosts' % name, None)
             allow_hosts = _merge_hosts(global_allow_hosts, name_allow_hosts)
-            cur_client = _get_ipaddr(req, strict_client)
+            cur_client = _get_ipaddr(request, strict_client)
             if allow_hosts is not None and cur_client not in allow_hosts:
                 raise exceptions.ForbiddenError()
-            return func(req, resp, **kwargs)
+            return func(data=data, request=request, response=response, **kwargs)
         __wraps.__url = url
         __wraps.__method = method
         return __wraps
