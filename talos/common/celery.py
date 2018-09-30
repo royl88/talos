@@ -37,7 +37,7 @@ def add(task_id, x, y):
     async_helper.send_task('project_name.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
     # send callback的参数必须与callback函数参数匹配(request，response除外)
     async_helper.send_callback(url_base, callback.callback_add,
-                                result=result,
+                                data_json,
                                 task_id=task_id)
     # 此处是异步回调结果，不需要服务器等待或者轮询，worker会主动发送进度或者结果，可以不return
     # 如果想要使用return方式，则按照正常celery流程编写代码
@@ -47,7 +47,7 @@ def add(task_id, x, y):
 from talos.common import async_helper
 # 可以使用函数参数中的任意变量作为url的变量（为了某种情况下作为url区分），当然也可以不用
 @async_helper.callback('/callback/add/{task_id}')
-def callback_add(result, task_id, request=None, response=None):
+def callback_add(data, task_id, request=None, response=None):
     db.save(task_id, result)
 
 5. route中添加回调
