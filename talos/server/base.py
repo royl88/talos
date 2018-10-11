@@ -104,7 +104,9 @@ def initialize_middlewares(middlewares=None):
     """初始化中间件"""
     from talos.middlewares import json_translator
     from talos.middlewares import limiter
+    from talos.middlewares import globalvars
     mids = [
+        globalvars.GlobalVars(),
         limiter.Limiter(),
         json_translator.JSONTranslator(),
     ]
