@@ -8,7 +8,6 @@ from __future__ import absolute_import
 
 import contextlib
 import copy
-import datetime
 import logging
 
 import six
@@ -776,11 +775,7 @@ class ResourceBase(object):
                 count = 0
                 if record is not None:
                     resource = record.to_dict()
-                if getattr(self.orm_meta, 'removed', None) is not None:
-                    if record is not None:
-                        count = query.update({'removed': datetime.datetime.now()})
-                else:
-                    count = query.delete()
+                count = query.delete(synchronize_session=False)
                 session.flush()
                 self._addtional_delete(session, resource)
                 return count, [resource]
@@ -815,11 +810,9 @@ class ResourceBase(object):
                 records = query.all()
                 count = 0
                 records = [rec.to_dict() for rec in records]
-                if len(records) > 0:
-                    if getattr(self.orm_meta, 'removed', None) is not None:
-                        count = query.update({'removed': datetime.datetime.now()})
-                    else:
-                        count = query.delete()
+                # FIXED, 数据已经通过.all()返回，此时不能使用synchronize_session的默认值'evaluate'，可以为fetch或False
+                # 因数据已被取回，所以此处直接False性能最高
+                count = query.delete(synchronize_session=False)
                 session.flush()
                 self._addtional_delete_all(session, records)
                 return count, records
