@@ -16,6 +16,12 @@ from ${pkg_name}.server.wsgi_server import application
 
 
 CONF = config.CONF
+HAS_BOOSTER = False
+try:
+    from gevent.pywsgi import WSGIServer
+    HAS_BOOSTER = True
+except ImportError as e:
+    pass
 
 
 def main():
@@ -26,8 +32,13 @@ def main():
     """
     bind_addr = CONF.server.bind
     port = CONF.server.port
-    httpd = make_server(bind_addr, port, application)
-    print("Serving on %s:%d..." % (bind_addr, port))
+    if HAS_BOOSTER:
+        print("Serving on %s:%d...[boost by gevent]" % (bind_addr, port))
+        httpd = WSGIServer((bind_addr, port), application)
+    else:
+        print("try 'pip install gevent' to boost simple server" )
+        print("Serving on %s:%d..." % (bind_addr, port))
+        httpd = make_server(bind_addr, port, application)
     httpd.serve_forever()
 
 
