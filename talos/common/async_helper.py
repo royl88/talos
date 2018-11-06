@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import functools
 import logging
+import uuid
 
 from falcon.routing import util
 
@@ -19,7 +20,8 @@ CONF = config.CONF
 
 
 class CallbackController(object):
-    def __init__(self, func, method):
+    def __init__(self, func, method, name=None):
+        self.name = name or uuid.uuid4().hex
         self.func = func
         self.method = method
         setattr(self, 'on_%s' % method.lower(), self.template)
@@ -62,6 +64,7 @@ def callback(url, name=None, method='POST'):
                 raise exceptions.ForbiddenError()
             return func(data=data, request=request, response=response, **kwargs)
         __wraps.__url = url
+        __wraps.__name = name
         __wraps.__method = method
         return __wraps
     return _wraps
@@ -69,8 +72,9 @@ def callback(url, name=None, method='POST'):
 
 def add_callback_route(api, func):
     url = func.__url
+    name = func.__name
     method = func.__method.lower()
-    api.add_route(url, CallbackController(func, method))
+    api.add_route(url, CallbackController(func, method, name=name))
 
 
 def send_callback(url_base, func, data, timeout=3, **kwargs):
