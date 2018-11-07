@@ -201,7 +201,10 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
      | _primary_keys   | 'id'   | 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表，这个是业务主键，意味着你可以定义和数据库主键不一样的字段（前提是你要确定这些字段是有唯一性的） |
      | _default_filter | {}     | 默认过滤查询，常用于软删除，比如数据删除我们在数据库字段中标记为is_deleted=True，那么我们再次list，get，update，delete的时候需要默认过滤这些数据的，等价于默认带有where is_delete = True |
      | _default_order  | []     | 默认排序，查询资源时被应用，('name', '+id', '-status'), +表示递增，-表示递减，默认递增 |
-     | _validate       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表，eg.
+     | _validate       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表    |
+     一个_validate示例如下：
+
+     ```python
         ColumnValidator(field='id',
                         validate_on=['create:M']),
         ColumnValidator(field='name',
@@ -212,16 +215,21 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
                         rule=validator.InValidator(['true', 'false', 'True', 'False'])
                         converter=converter.BooleanConverter(),
                         validate_on=['create:M', 'update:O']),
+     ```
 
-**field**: *字符串，字段名称*
-**rule**: *validator对象 或 校验类型rule_type所需要的参数，当rule是validator类型对象时，忽略 rule_type参数*
-**rule_type**: *字符串，用于快速定义校验规则，默认regex，可选类型有callback，regex，email，phone，url，length，in，notin，integer，float，type*
-**validate_on**: *数组，校验场景和必要性, eg. ['create: M', 'update:O']，表示此字段在create函数中为必要字段，update函数中为可选字段*
-**error_msg**: *字符串，错误提示信息，默认为'%(result)s'，即validator返回的报错信息，用户可以固定字符串或使用带有%(result)s的模板字符串*
-**converter**: *converter对象，数据转换器，当数据被校验后，可能需要转换为固定类型后才能进行编程处理，转换器可以为此提供自动转换，比如用户输入为'2018-01-01 01:01:01'字符串时间，程序需要为Datetime类型，则可以使用DateTimeConverter进行转换*
-**orm_required**: *布尔值，控制此字段是否会被传递到数据库SQL中去*
-**aliases**: *数组，字段的别名*
-**nullable**: *布尔值，控制此字段是否可以为None* |
+     ColumnValidator可以定义的属性如下：
+
+     | 属性         | 类型                                           | 描述                                                         |
+     | ------------ | ---------------------------------------------- | ------------------------------------------------------------ |
+     | field        | 字符串                                         | 字段名称                                                     |
+     | rule         | validator对象 或 校验类型rule_type所需要的参数 | 当rule是validator类型对象时，忽略 rule_type参数              |
+     | rule_type    | 字符串                                         | 用于快速定义校验规则，默认regex，可选类型有callback，regex，email，phone，url，length，in，notin，integer，float，type |
+     | validate_on  | 数组                                           | 校验场景和必要性, eg. ['create: M', 'update:O']，表示此字段在create函数中为必要字段，update函数中为可选字段 |
+     | error_msg    | 字符串                                         | 错误提示信息，默认为'%(result)s'，即validator返回的报错信息，用户可以固定字符串或使用带有%(result)s的模板字符串 |
+     | converter    | converter对象                                  | 数据转换器，当数据被校验后，可能需要转换为固定类型后才能进行编程处理，转换器可以为此提供自动转换，比如用户输入为'2018-01-01 01:01:01'字符串时间，程序需要为Datetime类型，则可以使用DateTimeConverter进行转换 |
+     | orm_required | 布尔值                                         | 控制此字段是否会被传递到数据库SQL中去                        |
+     | aliases      | 数组                                           | 字段的别名                                                   |
+     | nullable     | 布尔值                                         | 控制此字段是否可以为None                                     |
 
      CRUD使用方式:
 
@@ -236,7 +244,6 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
      resource.User().get('1')
      resource.User().update('1', {'name': 'test1'})
      resource.User().delete('1')
-     
      resource.UserPhoneNum().get(('1', '10086'))
      resource.UserPhoneNum().delete(('1', '10086'))
      ```
@@ -247,7 +254,7 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
      resource处理的是DB的CRUD操作，但往往业务类代码需要有复杂的处理逻辑，并且涉及多个resource类的相互操作，因此需要封装api层来处理此类逻辑，此处我们示例没有复杂逻辑，直接沿用定义即可
 
-     ```
+     ```python
      User = resource.User
      UserPhoneNum = resource.UserPhoneNum
      ```
@@ -412,7 +419,7 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
          多个字段排序以英文逗号间隔，默认递增，若字段前面有-减号则代表递减
 
        	      PS：我可以使用+name代表递增吗？
-
+        
        	      可以，但是HTTP URL中+号实际上的空格的编码，如果传递__orders=+name,-env_code，在HTTP中实际等价于__orders=空格name,-env_code, 无符号默认递增，因此无需多传递一个+号，传递字段即可
 
 
