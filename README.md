@@ -418,9 +418,9 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
          多个字段排序以英文逗号间隔，默认递增，若字段前面有-减号则代表递减
 
-       	      PS：我可以使用+name代表递增吗？
-        
-       	      可以，但是HTTP URL中+号实际上的空格的编码，如果传递__orders=+name,-env_code，在HTTP中实际等价于__orders=空格name,-env_code, 无符号默认递增，因此无需多传递一个+号，传递字段即可
+               PS：我可以使用+name代表递增吗？
+             
+               可以，但是HTTP URL中+号实际上的空格的编码，如果传递__orders=+name,-env_code，在HTTP中实际等价于__orders=空格name,-env_code, 无符号默认递增，因此无需多传递一个+号，传递字段即可
 
 
 ### 进阶开发
