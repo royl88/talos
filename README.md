@@ -202,7 +202,6 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
      | _default_filter | {}     | 默认过滤查询，常用于软删除，比如数据删除我们在数据库字段中标记为is_deleted=True，那么我们再次list，get，update，delete的时候需要默认过滤这些数据的，等价于默认带有where is_delete = True |
      | _default_order  | []     | 默认排序，查询资源时被应用，('name', '+id', '-status'), +表示递增，-表示递减，默认递增 |
      | _validate       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表，eg.
-[
         ColumnValidator(field='id',
                         validate_on=['create:M']),
         ColumnValidator(field='name',
@@ -213,7 +212,6 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
                         rule=validator.InValidator(['true', 'false', 'True', 'False'])
                         converter=converter.BooleanConverter(),
                         validate_on=['create:M', 'update:O']),
-]
 
 **field**: *字符串，字段名称*
 **rule**: *validator对象 或 校验类型rule_type所需要的参数，当rule是validator类型对象时，忽略 rule_type参数*
