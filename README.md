@@ -1,4 +1,4 @@
-talos project
+talos project[^1]
 =======================
 
 [TOC]
@@ -219,7 +219,8 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
      ColumnValidator可以定义的属性如下：
 
-     | 属性         | 类型                                           | 描述                                                         |
+
+     | 属性          | 类型                                           | 描述                                                         |
      | ------------ | ---------------------------------------------- | ------------------------------------------------------------ |
      | field        | 字符串                                         | 字段名称                                                     |
      | rule         | validator对象 或 校验类型rule_type所需要的参数 | 当rule是validator类型对象时，忽略 rule_type参数              |
@@ -247,6 +248,30 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
      resource.UserPhoneNum().get(('1', '10086'))
      resource.UserPhoneNum().delete(('1', '10086'))
      ```
+
+     内部查询通过组装dict来实现过滤条件，filter在表达 == 或这 in 列表时，可以直接使用一级字段即可，如name等于test：{'name': 'test'}
+
+     id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
+
+     更复杂的查询需要通过嵌套dict来实现：{'字段名称': {'过滤条件': '值'}}
+
+     | 过滤条件 | 值类型       |
+     | -------- | ------------ |
+     | in       | list         |
+     | nin      | list         |
+     | eq       | 根据字段类型 |
+     | ne       | 根据字段类型 |
+     | lt       | 根据字段类型 |
+     | lte      | 根据字段类型 |
+     | gt       | 根据字段类型 |
+     | gte      | 根据字段类型 |
+     | like     | string       |
+     | ilike    | string       |
+     | starts   | string       |
+     | istarts  | string       |
+     | ends     | string       |
+     | iends    | string       |
+
 
   5. ##### 业务api控制类
 
@@ -357,7 +382,7 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
     获取列表(查询)的接口可以使用Query参数过滤，使用过滤字段=xxx 或 字段__查询条件=xxx方式传递
 
-    1. - 过滤条件
+    - **过滤条件**
 
          eg.
 
@@ -396,7 +421,7 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
          | greater      | 大于                                                         |
          | greaterequal | 大于等于                                                     |
 
-    2. - 偏移量与数量限制
+    - **偏移量与数量限制**
 
          查询返回列表时，通常需要指定偏移量以及数量限制
 
@@ -408,7 +433,7 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
          代表取偏移量10，限制20条结果
 
-    3. - 排序
+    - **排序**
 
          排序对某些场景非常重要，可以免去客户端很多工作量
 
@@ -425,14 +450,132 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
 ### 进阶开发
 
-- 用户输入校验
-- 高级DB操作[hooks, 自定义query]
-- 会话重用和事务控制
-- 缓存
-- 异步任务
-- 频率限制
-- 数据库版本管理
+- **用户输入校验**
+
+  用户输入的数据，不一定是完全正确的，每个数据都需要校验后才能进行存储和处理，在上面已经提到过使用ColumnValidator来进行数据校验，这里主要是解释详细的校验规则和行为
+
+  1. ColumnValidator被默认集成在ResourceBase中，所以会自动进行校验判断
+
+  2. 未定义_validate时，将不启用校验，信任所有输入数据
+
+  3. 未定义的字段在清洗阶段会被忽略
+
+  4. 校验的关键函数为ResourceBase.validate
+
+     ```python
+     @classmethod
+     def validate(cls, data, situation, orm_required=False, validate=True, rule=None):
+         """
+         验证字段，并返回清洗后的数据
+         
+         * 当validate=False，不会对数据进行校验，仅返回ORM需要数据
+         * 当validate=True，对数据进行校验，并根据orm_required返回全部/ORM数据
+         
+         :param data: 清洗前的数据
+         :type data: dict
+         :param situation: 当前场景
+         :type situation: string
+         :param orm_required: 是否ORM需要的数据(ORM即Model表定义的字段)
+         :type orm_required: bool
+         :param validate: 是否验证规则
+         :type validate: bool
+         :param rule: 规则配置
+         :type rule: dict
+         :returns: 返回清洗后的数据
+         :rtype: dict
+         """
+     ```
+
+     *validate_on为什么是填写：create:M或者update:M，因为validate按照函数名进行场景判定，在ResourceBase.create函数中，默认将situation绑定在当前函数，即 'create'，update同理，而M代表必选，O代表可选*
+
+  5. 当前快速校验规则rule_type不能满足时，请使用Validator对象，内置Validator对象不能满足需求时，可以定制自己的Validator，Validator的定义需要满足2点：
+
+     从NullValidator中继承
+
+     重写validate函数，函数接受一个参数，并且返回True作为通过校验，返回错误字符串代表校验失败
+
+  6. Converter同上
+
+- **高级DB操作[hooks, 自定义query]**
+
+  1. 简单hooks
+
+  在db创建一个记录时，假设希望id是自动生成的UUID，通常这意味着我们不得不重写create函数：
+
+  ```python
+  class User(ResourceBase):
+      orm_meta = models.User
+      _primary_keys = 'id'
+      
+      def create(self, resource, validate=True, detail=True):
+          resource['id'] = uuid.uuid4().hex
+          super(User, self).create(resource, validate=validate, detail=validate)
+  ```
+
+  这样的操作对于我们而言是很笨重的，甚至create的实现比较复杂，让我们不希望到create里面去加这些不是那么关键的代码，对于这些操作，talos分成了2种场景，_before_create, _addtional_create，根据名称我们能知道，它们分别代表
+
+  create执行开始前：常用于一些数据的自动填充
+
+  create执行后但未提交：常用于强事务控制的操作，可以使用同一个事务进行操作以便一起提交或回滚
+
+  同理还有update，delete
+
+  同样的list和count都有_addtional_xxxx钩子
+
+  2. 动态hooks
+
+     以上的hooks都是类成员函数代码定义的，当使用者想要临时增加一个hook的时候呢，或者根据某个条件判断是否使用一个hook时，我们需要一种更动态的hook来支持，目前只有list和count支持此类hooks
+
+     list,count的hook的函数定义为：function(query, filters)，需要return 处理后的query
+
+     eg. self.list(hooks=[lambda q,f: return q])
+
+  3. 自定义query
+
+     在更复杂的场景下我们封装的操作函数可能无法达到目的，此时可以使用底层的SQLAlchemy Query对象来进行处理，比如在PG中INET类型的比较操作：
+
+     一个场景：我们不希望用户新增的子网信息与现有子网重叠
+
+     ```python
+     query = self._get_query(session)
+     query = query.filter(self.orm_meta.cidr.op(">>")(
+         subnet['cidr']) | self.orm_meta.cidr.op("<<")(subnet['cidr']))
+     if query.one_or_none():
+         raise ConflictError()
+     ```
+
+- **会话重用和事务控制**
+
+  在talos中，每个ResourceBase对象都可以申请会话和事务，而且可以接受一个已有的会话和事务对象，在使用完毕后talos会自动帮助你进行回滚/提交/关闭，这得益与python的with子句
+
+  ```python
+  u = User()
+  with u.transaction() as session:
+      u.update(...)
+      # 事务重用, 可以查询和变更操作, with子句结束会自动提交，异常会自动回滚
+      UserPhone(transaction=session).delete(...)
+      UserPhone(transaction=session).list(...)
+  with u.get_session() as session:
+      # 会话重用, 可以查询
+      UserPhone(session=session).list(...)
+  ```
+
+- **缓存**
+
+- **异步任务**
+
+- **频率限制**
+
+- **数据库版本管理**
 
 
 
 ## 国际化i18n
+
+
+
+
+
+
+
+[^1]: 本文档基于v1.1.8版本
