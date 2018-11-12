@@ -143,15 +143,22 @@ class TScheduler(Scheduler):
         if update:
             last_updated = self._last_updated
             all_schedules = self.all_schedules()
-            for entry in all_schedules.values():
-                if entry.last_updated and entry.last_updated > last_updated:
+            new_entries = {}
+            for n, s in all_schedules.items():
+                s = s.copy()
+                s['name'] = n
+                entry = TEntry(s)
+                new_entries[n] = entry
+                if last_updated is None and entry.last_updated is not None:
                     last_updated = entry.last_updated
+                elif entry.last_updated and entry.last_updated > last_updated:
+                    last_updated = entry.last_updated
+            self.data = new_entries
             self.install_default_entries(self.data)
             self.update_from_dict(self.app.conf.beat_schedule)
             self._last_updated = last_updated
-            self.data = all_schedules
             # the schedule changed, invalidate the heap in Scheduler.tick
-            self._heap = None
+            self._heap = []
         return self.data
 
     def set_schedule(self, schedule):
