@@ -28,7 +28,7 @@ class CallbackController(object):
 
     def template(self, req, resp, **kwargs):
         data = req.json
-        ref = self.func(data=data, request=req, response=resp, **kwargs)
+        self.func(data=data, request=req, response=resp, **kwargs)
 
 
 def callback(url, name=None, method='POST'):
@@ -83,11 +83,18 @@ def send_callback(url_base, func, data, timeout=3, **kwargs):
     vars, pattern = util.compile_uri_template(url)
     for var in vars:
         url = url.replace('{%s}' % var, kwargs.get(var))
+    url_base = CONF.public_endpoint if url_base is None else url_base
     url = url_base + url
     http_method = getattr(http.RestfulJson, method, None)
     LOG.debug('######## worker callback %s %s, data: %s', method, url, data)
     result = http_method(url, json=data, timeout=timeout)
     return result
+
+
+# since v1.1.9, rename callback to rpc
+rpc = callback
+add_rpc_route = add_callback_route
+rpc_call = send_callback
 
 
 def send_task(name, kwargs, **task_kwargs):
