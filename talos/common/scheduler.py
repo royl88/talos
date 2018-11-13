@@ -1,7 +1,5 @@
 # coding=utf-8
 
-from __future__ import absolute_import
-
 """
 scheduler需要的数据字段
 {
@@ -16,42 +14,47 @@ scheduler需要的数据字段
     expires: 当任务产生后，多久还没被执行就认为超时
     enabled: True/False,
     once: True/False,
+    max_instances： 相同任务最大并发数
     last_updated: ..., 
 }
 
 """
 
+from __future__ import absolute_import
+
 from datetime import timedelta
 
 from celery import schedules
 from celery.beat import ScheduleEntry, Scheduler
-
+import six
 from talos.core.i18n import _
-
 
 DEFAULT_MAX_INTERVAL = 5
 DEFAULT_PRIORITY = 5
 
 
 def maybe_schedule(s, relative=False, app=None):
-    if isinstance(s, dict):
-        schedule_type = s.get('type', 'interval')
+    schedule_type = s.get('type', 'interval')
+    schedule = s.get('schedule', None)
+    if isinstance(schedule, six.string_types):
         if schedule_type.upper() == 'INTERVAL':
-            s = schedules.schedule(
-                timedelta(seconds=float(s['schedule'])),
+            schedule = schedules.schedule(
+                timedelta(seconds=float(schedule)),
                 app=app
             )
         elif schedule_type.upper() == 'CRONTAB':
-            fields = s['schedule'].split()
-            s = schedules.crontab(*fields, app=app)
+            fields = schedule.split()
+            schedule = schedules.crontab(*fields, app=app)
         else:
             raise RuntimeError(_('can not parse schedule of type: %(type)s') % {'type': s.get('type', 'undefinded')})
     else:
-        s.app = app
-    return s
+        if schedule:
+            schedule.app = app
+    return schedule
 
 
 class TEntry(ScheduleEntry):
+
     def __init__(self, model, app=None):
         self.model = model.copy()
         self.app = app
@@ -61,10 +64,6 @@ class TEntry(ScheduleEntry):
         self.kwargs = model.get('kwargs')
         self.options = {'expires': model['expires']} if model.get('expires') else {}
         self.schedule = maybe_schedule(model, app=self.app)
-        # 设置model以在model中传递参数
-        self.model['last_run_at'] = model.get('last_run_at') or self.default_now()
-        self.model['total_run_count'] = model.get('total_run_count') or 0
-        self.model['last_updated'] = model.get('last_updated') or self.default_now()
 
     @property
     def enabled(self):
@@ -77,10 +76,14 @@ class TEntry(ScheduleEntry):
     @property
     def priority(self):
         return self.model.get('priority', DEFAULT_PRIORITY)
+    
+    @property
+    def max_instances(self):
+        return self.model.get('max_instances', 1)
 
     @property
     def last_run_at(self):
-        return self.model.get('last_run_at')
+        return self.model.get('last_run_at', self.default_now())
 
     @last_run_at.setter
     def last_run_at(self, value):
@@ -88,7 +91,7 @@ class TEntry(ScheduleEntry):
 
     @property
     def total_run_count(self):
-        return self.model.get('total_run_count')
+        return self.model.get('total_run_count', 0)
 
     @total_run_count.setter
     def total_run_count(self, value):
@@ -96,7 +99,7 @@ class TEntry(ScheduleEntry):
 
     @property
     def last_updated(self):
-        return self.model.get('last_updated')
+        return self.model.get('last_updated', self.default_now())
 
     @last_updated.setter
     def last_updated(self, value):
@@ -119,10 +122,12 @@ class TEntry(ScheduleEntry):
         self.last_run_at = self.default_now()
         self.total_run_count += 1
         return self.__class__(self.model, self.app)
+
     next = __next__  # for 2to3
 
 
 class TScheduler(Scheduler):
+
     def __init__(self, *args, **kwargs):
         """Initialize the scheduler."""
         super(TScheduler, self).__init__(*args, **kwargs)
