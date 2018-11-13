@@ -26,20 +26,26 @@ from datetime import timedelta
 from celery import schedules
 from celery.beat import ScheduleEntry, Scheduler
 
+from talos.core.i18n import _
+
 
 DEFAULT_MAX_INTERVAL = 5
 DEFAULT_PRIORITY = 5
 
 
 def maybe_schedule(s, relative=False, app=None):
-    if s.get('type', 'interval').upper() == 'INTERVAL':
-        s = schedules.schedule(
-            timedelta(seconds=float(s['schedule'])),
-            app=app
-        )
-    elif s['type'].upper() == 'CRONTAB':
-        fields = s['schedule'].split()
-        s = schedules.crontab(*fields, app=app)
+    if isinstance(s, dict):
+        schedule_type = s.get('type', 'interval')
+        if schedule_type.upper() == 'INTERVAL':
+            s = schedules.schedule(
+                timedelta(seconds=float(s['schedule'])),
+                app=app
+            )
+        elif schedule_type.upper() == 'CRONTAB':
+            fields = s['schedule'].split()
+            s = schedules.crontab(*fields, app=app)
+        else:
+            raise RuntimeError(_('can not parse schedule of type: %(type)s') % {'type': s.get('type', 'undefinded')})
     else:
         s.app = app
     return s
