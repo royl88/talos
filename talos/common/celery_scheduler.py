@@ -120,6 +120,7 @@ class TScheduler(Scheduler):
     def __init__(self, *args, **kwargs):
         """Initialize the scheduler."""
         super(TScheduler, self).__init__(*args, **kwargs)
+        self._init_schedules = True
         self._last_updated = None
         self.max_interval = (
             kwargs.get('max_interval')
@@ -158,12 +159,17 @@ class TScheduler(Scheduler):
         return False
 
     def all_schedules(self):
-        # all_schedules会全量替换，请记得setup_schedule，不要漏了系统默认、配置文件的schedules
+        # all_schedules仅限用户自定义的所有schedules
+        # beat的所有schedules = default_schedules + conf_schedules + all_schedules的字典
         return {}
 
-    def get_schedule(self):
+    @property
+    def schedule(self):
         update = False
-        if self.schedule_changed():
+        if self._init_schedules:
+            self._init_schedules = False
+            update = True
+        if not update and self.schedule_changed():
             update = True
         if update:
             last_updated = self._last_updated
@@ -186,6 +192,6 @@ class TScheduler(Scheduler):
             self._heap = []
         return self.data
 
-    def set_schedule(self, schedule):
-        self.data = schedule
-    schedule = property(get_schedule, set_schedule)
+    @schedule.setter
+    def schedule(self, value):
+        self.data = value
