@@ -47,7 +47,7 @@ def maybe_schedule(s, relative=False, app=None):
 
 class TEntry(ScheduleEntry):
     def __init__(self, model, app=None):
-        self.model = model
+        self.model = model.copy()
         self.app = app
         self.name = model['name']
         self.task = model['task']
@@ -55,9 +55,10 @@ class TEntry(ScheduleEntry):
         self.kwargs = model.get('kwargs')
         self.options = {'expires': model['expires']} if model.get('expires') else {}
         self.schedule = maybe_schedule(model, app=self.app)
-        self.last_run_at = self.default_now()
-        self.total_run_count = 0
-        self.last_updated = model.get('last_updated') or self.default_now()
+        # 设置model以在model中传递参数
+        self.model['last_run_at'] = model.get('last_run_at') or self.default_now()
+        self.model['total_run_count'] = model.get('total_run_count') or 0
+        self.model['last_updated'] = model.get('last_updated') or self.default_now()
 
     @property
     def enabled(self):
@@ -70,6 +71,30 @@ class TEntry(ScheduleEntry):
     @property
     def priority(self):
         return self.model.get('priority', DEFAULT_PRIORITY)
+
+    @property
+    def last_run_at(self):
+        return self.model.get('last_run_at')
+
+    @last_run_at.setter
+    def last_run_at(self, value):
+        self.model['last_run_at'] = value
+
+    @property
+    def total_run_count(self):
+        return self.model.get('total_run_count')
+
+    @total_run_count.setter
+    def total_run_count(self, value):
+        self.model['total_run_count'] = value
+
+    @property
+    def last_updated(self):
+        return self.model.get('last_updated')
+
+    @last_updated.setter
+    def last_updated(self, value):
+        self.model['last_updated'] = value
 
     def is_due(self):
         if not self.enabled:
