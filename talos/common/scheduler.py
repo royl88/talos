@@ -3,19 +3,19 @@
 """
 scheduler需要的数据字段
 {
-    name: ..., 
-    task: ..., 
-    description: ...
-    type: interval/crontab, 
-    schedule: 可以是 '5.1' 或者 '*/1 * * * *' , 
-    args:
-    kwargs:
-    priority: 优先级
-    expires: 当任务产生后，多久还没被执行就认为超时
-    enabled: True/False,
-    max_calls: None/1/4000,
-    max_instances： 相同任务最大并发数
-    last_updated: ..., 
+    name: string, 唯一名称
+    task: string, 任务模块函数
+    [description]: string, 备注信息
+    [type]: string, interval 或 crontab, 默认 interval
+    schedule: string/int/float/schedule eg. 1.0,'5.1', '10 *' , '*/10 * * * *' 
+    args: tuple/list, 参数
+    kwargs: dict, 命名参数
+    [priority]: int, 优先级, 默认5
+    [expires]: int, 单位为秒，当任务产生后，多久还没被执行会认为超时
+    [enabled]: bool, True/False, 默认True
+    [max_calls]: None/int, 最大调度次数, 默认None无限制
+    [max_instances]： None/int, 相同任务最大并发数, 默认None无限制
+    [last_updated]: Datetime, 本任务最后更新时间，常用于判断是否有定时任务需要更新，建议记录使用 
 }
 
 """
@@ -43,7 +43,7 @@ LOG = logging.getLogger(__name__)
 
 def maybe_schedule(s, relative=False, app=None):
     schedule_type = s.get('type', 'interval')
-    schedule = s.get('schedule', None)
+    schedule = s['schedule']
     if isinstance(schedule, (six.string_types, numbers.Number)):
         if schedule_type.upper() == 'INTERVAL':
             schedule = schedules.schedule(
@@ -87,7 +87,7 @@ class TEntry(ScheduleEntry):
 
     @property
     def max_instances(self):
-        return self.model.setdefault('max_instances', 1)
+        return self.model.setdefault('max_instances', None)
 
     @property
     def last_run_at(self):
@@ -303,11 +303,11 @@ class TScheduler(Scheduler):
             maybe_updated_entries = list(set(self.data.keys()) & set(old_data.keys()))
             updated_counter = 0
             for name in maybe_updated_entries:
-                self.data[name].total_run_count = old_data[name].total_run_count
-                self.data[name].last_run_at = old_data[name].last_run_at
                 if self.data[name] != old_data[name]:
                     updated_counter += 1
                     LOG.debug('schedule updated: %s' % self.data[name])
+                self.data[name].total_run_count = old_data[name].total_run_count
+                self.data[name].last_run_at = old_data[name].last_run_at
             # 确实有定时器更新，重新计算heap
             if deleted_entries or new_entries or updated_counter:
                 self._heap_invalid = True
