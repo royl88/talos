@@ -642,18 +642,18 @@ with u.get_session() as session:
     "broker_url": "pyamqp://test:test@127.0.0.1//",
     ...
     "beat_schedule": {...}
-    "beat_scheduler": "talos.common.celery_scheduler:TScheduler"
+    "beat_scheduler": "talos.common.scheduler:TScheduler"
 ```
 
 或者命令行启动时指定：
 
-启动beat： celery -A cms.server.celery_worker beat --loglevel=DEBUG -S talos.common.celery_scheduler:TScheduler 
+启动beat： celery -A cms.server.celery_worker beat --loglevel=DEBUG -S talos.common.scheduler:TScheduler 
 
 启动worker：celery -A cms.server.celery_worker worker --loglevel=DEBUG -Q cms-dev-queue
 
 
 
-  ##### 动态配置定时任务：
+##### 动态配置定时任务：
 
 使用TScheduler预留的hooks进行动态定时任务配置：
 
