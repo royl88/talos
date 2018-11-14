@@ -13,7 +13,7 @@ scheduler需要的数据字段
     priority: 优先级
     expires: 当任务产生后，多久还没被执行就认为超时
     enabled: True/False,
-    once: True/False,
+    max_calls: None/1/4000,
     max_instances： 相同任务最大并发数
     last_updated: ..., 
 }
@@ -22,12 +22,19 @@ scheduler需要的数据字段
 
 from __future__ import absolute_import
 
+from collections import namedtuple
+import copy
 from datetime import timedelta
+import heapq
+import numbers
 
 from celery import schedules
 from celery.beat import ScheduleEntry, Scheduler
 import six
 from talos.core.i18n import _
+
+
+event_t = namedtuple('event_t', ('time', 'priority', 'entry'))
 
 DEFAULT_MAX_INTERVAL = 5
 DEFAULT_PRIORITY = 5
@@ -36,7 +43,7 @@ DEFAULT_PRIORITY = 5
 def maybe_schedule(s, relative=False, app=None):
     schedule_type = s.get('type', 'interval')
     schedule = s.get('schedule', None)
-    if isinstance(schedule, six.string_types):
+    if isinstance(schedule, (six.string_types, numbers.Number)):
         if schedule_type.upper() == 'INTERVAL':
             schedule = schedules.schedule(
                 timedelta(seconds=float(schedule)),
@@ -67,23 +74,23 @@ class TEntry(ScheduleEntry):
 
     @property
     def enabled(self):
-        return self.model.get('enabled', True)
+        return self.model.setdefault('enabled', True)
 
     @property
-    def once(self):
-        return self.model.get('once', False)
+    def max_calls(self):
+        return self.model.setdefault('max_calls', None)
 
     @property
     def priority(self):
-        return self.model.get('priority', DEFAULT_PRIORITY)
-    
+        return self.model.setdefault('priority', DEFAULT_PRIORITY)
+
     @property
     def max_instances(self):
-        return self.model.get('max_instances', 1)
+        return self.model.setdefault('max_instances', 1)
 
     @property
     def last_run_at(self):
-        return self.model.get('last_run_at', self.default_now())
+        return self.model.setdefault('last_run_at', self.default_now())
 
     @last_run_at.setter
     def last_run_at(self, value):
@@ -91,7 +98,7 @@ class TEntry(ScheduleEntry):
 
     @property
     def total_run_count(self):
-        return self.model.get('total_run_count', 0)
+        return self.model.setdefault('total_run_count', 0)
 
     @total_run_count.setter
     def total_run_count(self, value):
@@ -99,7 +106,7 @@ class TEntry(ScheduleEntry):
 
     @property
     def last_updated(self):
-        return self.model.get('last_updated', self.default_now())
+        return self.model.setdefault('last_updated', self.default_now())
 
     @last_updated.setter
     def last_updated(self, value):
@@ -107,10 +114,10 @@ class TEntry(ScheduleEntry):
 
     def is_due(self):
         if not self.enabled:
-            # 5 second delay for re-enable.
-            return schedules.schedstate(False, DEFAULT_MAX_INTERVAL)
-        if self.once and self.enabled and self.total_run_count > 0:
-            # Don't recheck
+            # enabled直接跳过
+            return schedules.schedstate(False, None)
+        if self.enabled and self.max_calls is not None and self.total_run_count >= self.max_calls:
+            # 启用但任务已超过最大调用次数
             return schedules.schedstate(False, None)
         return self.schedule.is_due(self.last_run_at)
 
@@ -137,6 +144,65 @@ class TScheduler(Scheduler):
             kwargs.get('max_interval')
             or self.app.conf.beat_max_loop_interval
             or DEFAULT_MAX_INTERVAL)
+
+    def populate_heap(self, event_t=event_t, heapify=heapq.heapify):
+        """Populate the heap with the data contained in the schedule."""
+        self._heap = []
+        for entry in self.schedule.values():
+            is_due, next_call_delay = entry.is_due()
+            # 如果不需要再次出现在heap中，因为永远延期调度
+            if next_call_delay is not None:
+                self._heap.append(event_t(
+                    self._when(
+                        entry,
+                        0 if is_due else next_call_delay
+                    ) or 0,
+                    entry.priority, entry
+                ))
+        heapify(self._heap)
+
+    # pylint disable=redefined-outer-name
+    def tick(self, event_t=event_t, min=min, heappop=heapq.heappop,
+             heappush=heapq.heappush):
+        """Run a tick - one iteration of the scheduler.
+
+        Executes one due task per call.
+
+        Returns:
+            float: preferred delay in seconds for next call.
+        """
+        adjust = self.adjust
+        max_interval = self.max_interval
+
+        if (self._heap is None or
+                not self.schedules_equal(self.old_schedulers, self.schedule)):
+            self.old_schedulers = copy.copy(self.schedule)
+            self.populate_heap()
+
+        H = self._heap
+
+        if not H:
+            return max_interval
+
+        event = H[0]
+        entry = event[2]
+        is_due, next_time_to_run = self.is_due(entry)
+        if is_due:
+            verify = heappop(H)
+            if verify is event:
+                next_entry = self.reserve(entry)
+                self.apply_entry(entry, producer=self.producer)
+                heappush(H, event_t(self._when(next_entry, next_time_to_run),
+                                    event[1], next_entry))
+                return 0
+            else:
+                heappush(H, verify)
+                return min(verify[0], max_interval)
+        else:
+            # 此任务已经永远无法被调度到，直接从heap中移除
+            if next_time_to_run is None:
+                heappop(H)
+        return min(adjust(next_time_to_run) or max_interval, max_interval)
 
     def setup_schedule(self):
         self.install_default_entries(self.data)
@@ -167,11 +233,13 @@ class TScheduler(Scheduler):
     def schedule_changed(self):
         # 可以通过记录self._last_updated与获取定时任务列表的last_updated进行对比
         # 比如：rpc_call(count_changed, self._last_updated) > 0
+        # TODO: 增加hooks
         return False
 
     def all_schedules(self):
         # all_schedules仅限用户自定义的所有schedules
         # beat的所有schedules = default_schedules + conf_schedules + all_schedules的字典
+        # TODO: 增加hooks
         return {}
 
     @property
@@ -199,6 +267,9 @@ class TScheduler(Scheduler):
             self.install_default_entries(self.data)
             self.update_from_dict(self.app.conf.beat_schedule)
             self._last_updated = last_updated
+            # TODO: 如果因为一个简单修改而导致数据全部重新载入，会导致已运行的任务信息丢失
+            # 比如：原max_calls=3的任务，因为重载而导致了total_run_count被重置，任务会重新运行
+            # 这并不是我们希望的结果，需要修复，不能导致total_run_count和last_run_at被重置
             # the schedule changed, invalidate the heap in Scheduler.tick
             self._heap = []
         return self.data
