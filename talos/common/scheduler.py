@@ -34,7 +34,6 @@ from celery.beat import ScheduleEntry, Scheduler
 import six
 from talos.core.i18n import _
 
-
 event_t = namedtuple('event_t', ('time', 'priority', 'entry'))
 
 DEFAULT_MAX_INTERVAL = 5
@@ -322,4 +321,5 @@ class TScheduler(Scheduler):
     def schedules_equal(self, old_schedules, new_schedules):
         if self._heap_invalid:
             return False
-        return True
+        # 如果任务属性被更新了，依然not equal
+        return super(TScheduler, self).schedules_equal(old_schedules, new_schedules)
