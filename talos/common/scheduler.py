@@ -152,6 +152,7 @@ class TScheduler(Scheduler):
         # setup_schedule 需要 _init_schedules & _last_updated, 必须先初始化这2个属性
         self._init_schedules = True
         self._last_updated = None
+        self._heap_invalid = False
         super(TScheduler, self).__init__(*args, **kwargs)
         self.max_interval = (
             kwargs.get('max_interval')
@@ -161,7 +162,8 @@ class TScheduler(Scheduler):
     def populate_heap(self, event_t=event_t, heapify=heapq.heapify):
         """Populate the heap with the data contained in the schedule."""
         self._heap = []
-        for entry in self.schedule.values():
+        self._heap_invalid = False
+        for entry in self.data.values():
             is_due, next_call_delay = entry.is_due()
             # 如果不需要再次出现在heap中，因为永远延期调度
             if next_call_delay is not None:
@@ -299,16 +301,25 @@ class TScheduler(Scheduler):
             new_entries = [self.data[name] for name in list(set(self.data.keys()) - set(old_data.keys()))]
             for entry in new_entries:
                 LOG.debug('schedule add: %s' % entry)
-            updated_entries = list(set(self.data.keys()) & set(old_data.keys()))
-            for name in updated_entries:
+            maybe_updated_entries = list(set(self.data.keys()) & set(old_data.keys()))
+            updated_counter = 0
+            for name in maybe_updated_entries:
                 self.data[name].total_run_count = old_data[name].total_run_count
                 self.data[name].last_run_at = old_data[name].last_run_at
                 if self.data[name] != old_data[name]:
+                    updated_counter += 1
                     LOG.debug('schedule updated: %s' % self.data[name])
-            # the schedule changed, invalidate the heap in Scheduler.tick
-            self._heap = None
+            # 确实有定时器更新，重新计算heap
+            if deleted_entries or new_entries or updated_counter:
+                self._heap_invalid = True
+
         return self.data
 
     @schedule.setter
     def schedule(self, value):
         self.data = value
+
+    def schedules_equal(self, old_schedules, new_schedules):
+        if self._heap_invalid:
+            return False
+        return True
