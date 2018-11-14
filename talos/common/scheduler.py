@@ -26,6 +26,7 @@ from collections import namedtuple
 import copy
 from datetime import timedelta
 import heapq
+import logging
 import numbers
 
 from celery import schedules
@@ -38,6 +39,7 @@ event_t = namedtuple('event_t', ('time', 'priority', 'entry'))
 
 DEFAULT_MAX_INTERVAL = 5
 DEFAULT_PRIORITY = 5
+LOG = logging.getLogger(__name__)
 
 
 def maybe_schedule(s, relative=False, app=None):
@@ -112,6 +114,16 @@ class TEntry(ScheduleEntry):
     def last_updated(self, value):
         self.model['last_updated'] = value
 
+    def editable_fields_equal(self, other):
+        for attr in ('task', 'args', 'kwargs', 'options', 'schedule',
+                     'enabled', 'max_calls', 'priority', 'max_instances'):
+            if getattr(self, attr) != getattr(other, attr):
+                return False
+        return True
+
+    def __eq__(self, other):
+        return self.editable_fields_equal(other)
+
     def is_due(self):
         if not self.enabled:
             # enabled直接跳过
@@ -137,9 +149,10 @@ class TScheduler(Scheduler):
 
     def __init__(self, *args, **kwargs):
         """Initialize the scheduler."""
-        super(TScheduler, self).__init__(*args, **kwargs)
+        # setup_schedule 需要 _init_schedules & _last_updated, 必须先初始化这2个属性
         self._init_schedules = True
         self._last_updated = None
+        super(TScheduler, self).__init__(*args, **kwargs)
         self.max_interval = (
             kwargs.get('max_interval')
             or self.app.conf.beat_max_loop_interval
@@ -199,14 +212,20 @@ class TScheduler(Scheduler):
                 heappush(H, verify)
                 return min(verify[0], max_interval)
         else:
-            # 此任务已经永远无法被调度到，直接从heap中移除
+            # 此任务已经永远无法被调度到，直接从heap中移除, 并且马上tick计算下一个
             if next_time_to_run is None:
                 heappop(H)
+                if self._heap:
+                    return 0
         return min(adjust(next_time_to_run) or max_interval, max_interval)
 
     def setup_schedule(self):
         self.install_default_entries(self.data)
         self.update_from_dict(self.app.conf.beat_schedule)
+        entries = self.schedules_as_entries()
+        self.data.update(entries)
+        if self._init_schedules:
+            self._init_schedules = False
 
     def install_default_entries(self, data):
         entries = {}
@@ -236,11 +255,27 @@ class TScheduler(Scheduler):
         # TODO: 增加hooks
         return False
 
-    def all_schedules(self):
-        # all_schedules仅限用户自定义的所有schedules
-        # beat的所有schedules = default_schedules + conf_schedules + all_schedules的字典
+    def user_schedules(self):
+        # user_schedules仅限用户自定义的所有schedules
+        # beat的所有schedules = default_schedules + conf_schedules + user_schedules的字典
         # TODO: 增加hooks
         return {}
+
+    def schedules_as_entries(self):
+        schedules = self.user_schedules()
+        last_updated = self._last_updated
+        new_entries = {}
+        for n, s in schedules.items():
+            s = s.copy()
+            s['name'] = n
+            entry = TEntry(s)
+            new_entries[n] = entry
+            if last_updated is None and entry.last_updated is not None:
+                last_updated = entry.last_updated
+            elif entry.last_updated and entry.last_updated > last_updated:
+                last_updated = entry.last_updated
+        self._last_updated = last_updated
+        return new_entries
 
     @property
     def schedule(self):
@@ -251,27 +286,27 @@ class TScheduler(Scheduler):
         if not update and self.schedule_changed():
             update = True
         if update:
-            last_updated = self._last_updated
-            all_schedules = self.all_schedules()
-            new_entries = {}
-            for n, s in all_schedules.items():
-                s = s.copy()
-                s['name'] = n
-                entry = TEntry(s)
-                new_entries[n] = entry
-                if last_updated is None and entry.last_updated is not None:
-                    last_updated = entry.last_updated
-                elif entry.last_updated and entry.last_updated > last_updated:
-                    last_updated = entry.last_updated
-            self.data = new_entries
+            old_data = self.data
+            self.data = {}
             self.install_default_entries(self.data)
             self.update_from_dict(self.app.conf.beat_schedule)
-            self._last_updated = last_updated
-            # TODO: 如果因为一个简单修改而导致数据全部重新载入，会导致已运行的任务信息丢失
-            # 比如：原max_calls=3的任务，因为重载而导致了total_run_count被重置，任务会重新运行
-            # 这并不是我们希望的结果，需要修复，不能导致total_run_count和last_run_at被重置
+            entries = self.schedules_as_entries()
+            self.data.update(entries)
+            LOG.info('schedules changed, reschedule...')
+            deleted_entries = [old_data[name] for name in list(set(old_data.keys()) - set(self.data.keys()))]
+            for entry in deleted_entries:
+                LOG.debug('schedule deleted: %s' % entry)
+            new_entries = [self.data[name] for name in list(set(self.data.keys()) - set(old_data.keys()))]
+            for entry in new_entries:
+                LOG.debug('schedule add: %s' % entry)
+            updated_entries = list(set(self.data.keys()) & set(old_data.keys()))
+            for name in updated_entries:
+                self.data[name].total_run_count = old_data[name].total_run_count
+                self.data[name].last_run_at = old_data[name].last_run_at
+                if self.data[name] != old_data[name]:
+                    LOG.debug('schedule updated: %s' % self.data[name])
             # the schedule changed, invalidate the heap in Scheduler.tick
-            self._heap = []
+            self._heap = None
         return self.data
 
     @schedule.setter
