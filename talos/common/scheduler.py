@@ -14,31 +14,36 @@ scheduler需要的数据字段
     [expires]: int, 单位为秒，当任务产生后，多久还没被执行会认为超时
     [enabled]: bool, True/False, 默认True
     [max_calls]: None/int, 最大调度次数, 默认None无限制
-    [max_instances]： None/int, 相同任务最大并发数, 默认None无限制
-    [last_updated]: Datetime, 本任务最后更新时间，常用于判断是否有定时任务需要更新，建议记录使用 
+    [max_instances]： None/int, 相同任务最大并发数, 默认None无限制, 未支持
+    [last_updated]: Datetime, 任务最后更新时间，常用于判断是否有定时任务需要更新，建议记录使用
 }
 
 """
 
 from __future__ import absolute_import
 
+from datetime import timedelta
 from collections import namedtuple
 import copy
-from datetime import timedelta
 import heapq
+import inspect
 import logging
 import numbers
+import sys
 
 from celery import schedules
 from celery.beat import ScheduleEntry, Scheduler
 import six
+from talos.core import utils
 from talos.core.i18n import _
+from talos.core import config
 
 event_t = namedtuple('event_t', ('time', 'priority', 'entry'))
 
 DEFAULT_MAX_INTERVAL = 5
 DEFAULT_PRIORITY = 5
 LOG = logging.getLogger(__name__)
+CONF = config.CONF
 
 
 def maybe_schedule(s, relative=False, app=None):
@@ -146,17 +151,20 @@ class TEntry(ScheduleEntry):
 
 class TScheduler(Scheduler):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, app, *args, **kwargs):
         """Initialize the scheduler."""
         # setup_schedule 需要 _init_schedules & _last_updated, 必须先初始化这2个属性
         self._init_schedules = True
         self._last_updated = None
         self._heap_invalid = False
-        super(TScheduler, self).__init__(*args, **kwargs)
-        self.max_interval = (
-            kwargs.get('max_interval')
-            or self.app.conf.beat_max_loop_interval
-            or DEFAULT_MAX_INTERVAL)
+        self._last_schedule_changed = app.now()
+        self.max_interval = kwargs.get('max_interval', 0) or app.conf.beat_max_loop_interval or DEFAULT_MAX_INTERVAL
+        kwargs['max_interval'] = self.max_interval
+        self. on_user_schedules_changed = self._import_hooks(utils.get_config(
+            CONF, 'celery.talos_on_user_schedules_changed', []))
+        self. on_user_schedules = self._import_hooks(utils.get_config(
+            CONF, 'celery.talos_on_user_schedules', []))
+        super(TScheduler, self).__init__(app, *args, **kwargs)
 
     def populate_heap(self, event_t=event_t, heapify=heapq.heapify):
         """Populate the heap with the data contained in the schedule."""
@@ -251,16 +259,39 @@ class TScheduler(Scheduler):
         self.data.update(s)
 
     def schedule_changed(self):
-        # 可以通过记录self._last_updated与获取定时任务列表的last_updated进行对比
-        # 比如：rpc_call(count_changed, self._last_updated) > 0
-        # TODO: 增加hooks
+        now = self.app.now()
+        if now - self._last_schedule_changed >= timedelta(seconds=self.max_interval):
+            # 需要检测changed
+            self._last_schedule_changed = now
+            return self.user_schedules_changed()
         return False
+
+    def _import_hooks(self, names):
+        hooks = []
+        for name in names:
+            mod, func = name.split(':')
+            __import__(mod)
+            mod = sys.modules[mod]
+            hook = getattr(mod, func)
+            if hook and inspect.isclass(hook):
+                hook = hook(self)
+            hooks.append(hook)
+        return hooks
+
+    def user_schedules_changed(self):
+        result = False
+        for hook in self.on_user_schedules_changed:
+            if hook(self):
+                result = True
+        return result
 
     def user_schedules(self):
         # user_schedules仅限用户自定义的所有schedules
         # beat的所有schedules = default_schedules + conf_schedules + user_schedules的字典
-        # TODO: 增加hooks
-        return {}
+        result = {}
+        for hook in self.on_user_schedules:
+            result.update(hook(self))
+        return result
 
     def schedules_as_entries(self):
         schedules = self.user_schedules()
@@ -273,7 +304,7 @@ class TScheduler(Scheduler):
             new_entries[n] = entry
             if last_updated is None and entry.last_updated is not None:
                 last_updated = entry.last_updated
-            elif entry.last_updated and entry.last_updated > last_updated:
+            elif last_updated and entry.last_updated and entry.last_updated > last_updated:
                 last_updated = entry.last_updated
         self._last_updated = last_updated
         return new_entries
@@ -287,13 +318,13 @@ class TScheduler(Scheduler):
         if not update and self.schedule_changed():
             update = True
         if update:
+            LOG.info('schedules changed detection: reschedule begin...')
             old_data = self.data
             self.data = {}
             self.install_default_entries(self.data)
             self.update_from_dict(self.app.conf.beat_schedule)
             entries = self.schedules_as_entries()
             self.data.update(entries)
-            LOG.info('schedules changed, reschedule...')
             deleted_entries = [old_data[name] for name in list(set(old_data.keys()) - set(self.data.keys()))]
             for entry in deleted_entries:
                 LOG.debug('schedule deleted: %s' % entry)
@@ -311,6 +342,9 @@ class TScheduler(Scheduler):
             # 确实有定时器更新，重新计算heap
             if deleted_entries or new_entries or updated_counter:
                 self._heap_invalid = True
+            else:
+                LOG.debug('schedule not change a bit')
+            LOG.info('schedules changed detection, reschedule end...')
 
         return self.data
 
@@ -323,3 +357,8 @@ class TScheduler(Scheduler):
             return False
         # 如果任务属性被更新了，依然not equal
         return super(TScheduler, self).schedules_equal(old_schedules, new_schedules)
+
+    @property
+    def last_updated(self):
+        # 用户schedules的最后更新时间
+        return self._last_updated
