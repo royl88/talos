@@ -577,9 +577,17 @@ with u.get_session() as session:
 
 #### 定时任务[^ 2]
 
+talos中你可以使用原生celery的定时任务机制，也可以使用talos中提供的扩展定时任务(TScheduler)，扩展的定时任务可以在5s(可通过beat_max_loop_interval来修改这个时间)内发现定时任务的变化并刷新调度，从而提供动态的定时任务，而定时任务的来源可以从配置文件，也可以通过自定义的函数中动态提供
+
+> 原生celery的scheduler是不支持动态定时任务的
+
+> 使用原生celery定时任务因为talos配置项为json数据而无法提供复杂类型的schedule，当然也可以使用add_periodic_task来解决，但会降低我们使用的便利性
+>
+> 这些问题在talos扩展定时任务中得以解决
+
 ##### 静态配置定时任务：
 
-使用最原始的celery定时任务配置，最快捷的定时任务例子：
+使用最原始的celery定时任务配置，最快捷的定时任务例子[^ 3]：
 
 ```json
     "celery": {
@@ -651,15 +659,114 @@ with u.get_session() as session:
 
 启动worker：celery -A cms.server.celery_worker worker --loglevel=DEBUG -Q cms-dev-queue
 
+除了type，TScheduler的任务还提供了很多其他的扩展属性，以下是属性以及其描述
+
+```
+name:           string, 唯一名称
+task:           string, 任务模块函数
+[description]:  string, 备注信息
+[type]:         string, interval 或 crontab, 默认 interval
+schedule:       string/int/float/schedule eg. 1.0,'5.1', '10 *' , '*/10 * * * *' 
+args:           tuple/list, 参数
+kwargs:         dict, 命名参数
+[priority]:     int, 优先级, 默认5
+[expires]:      int, 单位为秒，当任务产生后，多久还没被执行会认为超时
+[enabled]:      bool, True/False, 默认True
+[max_calls]:    None/int, 最大调度次数, 默认None无限制
+[last_updated]: Datetime, 任务最后更新时间，常用于判断是否有定时任务需要更新
+```
+
 
 
 ##### 动态配置定时任务：
 
-使用TScheduler预留的hooks进行动态定时任务配置：
+TScheduler的动态任务仅限用户自定义的所有schedules
+所有定时任务 = 配置文件任务 + add_periodic_task任务 + hooks任务，hooks任务可以通过相同name来覆盖已存在配置中的任务，否则相互独立
 
-TODO
+- 使用TScheduler预留的hooks进行动态定时任务配置(推荐方式)：
 
-使用官方的setup_periodic_tasks进行动态配置
+  TScheduler中预留了2个hooks：talos_on_user_schedules_changed/talos_on_user_schedules
+
+  **talos_on_user_schedules_changed**钩子用于判断是否需要更新定时器，钩子被执行的最小间隔是beat_max_loop_interval(如不设置默认为5s)
+
+  钩子定义为callable(scheduler)，返回值是True/False
+
+  **talos_on_user_schedules**钩子用于提供新的定时器字典数据
+
+  钩子定义为callable(scheduler)，返回值是字典，全量的自定义动态定时器
+
+  我们来尝试提供一个，每过13秒自动生成一个全新定时器的代码
+
+  以下是cms.workers.periodic.hooks.py的文件内容
+
+  ```python
+  import datetime
+  from datetime import timedelta
+  import random
+  
+  # talos_on_user_schedules_changed, 用于判断是否需要更新定时器
+  # 默认每5s调用一次
+  class ChangeDetection(object):
+      '''
+      等价于函数，只是此处我们需要保留_last_modify属性所以用类来定义callable
+      def ChangeDetection(scheduler):
+          ...do something...
+      '''
+      def __init__(self, scheduler):
+          self._last_modify = self.now()
+      def now(self):
+          return datetime.datetime.now()
+      def __call__(self, scheduler):
+          now = self.now()
+          # 每过13秒定义定时器有更新
+          if now - self._last_modify >= timedelta(seconds=13):
+              self._last_modify = now
+              return True
+          return False
+  
+  # talos_on_user_schedules, 用于提供新的定时器字典数据
+  # 在talos_on_user_schedules_changed hooks返回True后被调用
+  class Schedules(object):
+      '''
+      等价于函数
+      def Schedules(scheduler):
+          ...do something...
+      '''
+      def __init__(self, scheduler):
+          pass
+      def __call__(self, scheduler):
+          interval = random.randint(1,10)
+          name = 'dynamic_every_%s s' % interval
+          # 生成一个纯随机的定时任务
+          return {name: {'task': 'cms.workers.periodic.tasks.test_add', 'schedule': interval, 'args': (1,3)}}
+  ```
+
+  配置文件如下：
+
+  ```json
+      "celery": {
+          ...
+          "beat_schedule": {
+              "every_5s_max_call_2_times": {
+                  "task": "cms.workers.periodic.tasks.test_add",
+                  "schedule": "5",
+                  "max_calls": 2,
+                  "enabled": true,
+                  "args": [1, 3]
+              }
+          },
+          "talos_on_user_schedules_changed":[
+              "cms.workers.periodic.hooks:ChangeDetection"],
+          "talos_on_user_schedules": [
+              "cms.workers.periodic.hooks:Schedules"]
+      },
+  ```
+
+  得到的结果是，一个每5s，最多调度2次的定时任务；一个每>=13s自动生成的随机定时任务
+
+- 使用官方的setup_periodic_tasks进行动态配置
+
+  见celery文档
 
   截止当前2018.11.13 celery 4.2.0在定时任务中依然存在问题，使用官方建议的on_after_configure动态配置定时器时，定时任务不会被触发：[GitHub Issue 3589](https://github.com/celery/celery/issues/3589)
 
@@ -673,7 +780,7 @@ TODO
       print(arg)
   ```
 
-而测试以下代码有效，推荐使用：
+而测试以下代码有效，可以使用以下方法：
 
 ```
 @celery.app.on_after_finalize.connect
@@ -709,3 +816,4 @@ def test(arg):
 
 [^1]: 本文档基于v1.1.8版本
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
+[^ 3]: v1.1.8版本中仅支持这类简单的定时任务
