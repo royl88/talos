@@ -100,22 +100,26 @@ def initialize_applications(api):
             app.route.add_routes(api)
 
 
-def initialize_middlewares(middlewares=None):
+def initialize_middlewares(middlewares=None, override_defalut=False):
     """初始化中间件"""
     from talos.middlewares import json_translator
     from talos.middlewares import limiter
     from talos.middlewares import globalvars
-    mids = [
-        globalvars.GlobalVars(),
-        limiter.Limiter(),
-        json_translator.JSONTranslator(),
-    ]
+    override_defalut = override_defalut or config.CONF.override_defalut_middlewares
+    if override_defalut:
+        mids = []
+    else:
+        mids = [
+            globalvars.GlobalVars(),
+            limiter.Limiter(),
+            json_translator.JSONTranslator(),
+        ]
     middlewares = middlewares or []
     mids.extend(middlewares)
     return mids
 
 
-def initialize_server(appname, conf, conf_dir=None, middlewares=None):
+def initialize_server(appname, conf, conf_dir=None, middlewares=None, override_middlewares=False):
     """
     初始化整个service
 
@@ -131,7 +135,7 @@ def initialize_server(appname, conf, conf_dir=None, middlewares=None):
     initialize_logger()
     initialize_i18n(appname)
     initialize_db()
-    api = falcon.API(middleware=initialize_middlewares(middlewares))
+    api = falcon.API(middleware=initialize_middlewares(middlewares, override_defalut=override_middlewares))
     initialize_applications(api)
     api.add_error_handler(exceptions.Error, error_http_exception)
     api.set_error_serializer(error_serializer)

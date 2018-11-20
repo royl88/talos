@@ -184,6 +184,7 @@ CONFIG_OPTS = {
     'locale_path': UNSET,
     'global_list_size_limit_enabled': False,
     'global_list_size_limit': None,
+    'override_defalut_middlewares': False,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
@@ -209,6 +210,10 @@ CONFIG_OPTS = {
         'pool_timeout': 5,
         'max_overflow': 5,
     },
+    'cache': {
+        'type': UNSET,
+        'expiration': 3600
+    },
     'application': {
         'names': []
     },
@@ -221,6 +226,10 @@ CONFIG_OPTS = {
         'header_reset': 'X-RateLimit-Reset',
         'header_remaining': 'X-RateLimit-Remaining',
         'header_limit': 'X-RateLimit-Limit',
+    },
+    'celery': {
+        'talos_on_user_schedules_changed': [],
+        'talos_on_user_schedules': []
     }
 
 }
