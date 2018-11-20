@@ -20,14 +20,14 @@ https://gitee.com/wu.jianjun/talos/tree/master/release
 * 基于falcon，高效
 * 使用SQLAlchemy作为数据库后端，快速切换数据库
 * 项目生成工具
-* 迅捷的开发
-* 简洁而全面的RESTfult CRUD API支持
-* 便于调试
-* 异步celery封装集成
+* 快速RESTfult CRUD API开发
+* filters，pagination，orders支持
+* validation数据校验
+* 异步任务集成[celery]
+* 定时任务集成[celery]
 * 频率限制
 * 国际化i18n支持
 * SMTP邮件、AD域、CSV导出、缓存等常用模块集成
-* 通用的wsgi启动部署方式
 
 首先setup.py install 安装talos,运行talos生成工具生成项目
 
@@ -571,9 +571,91 @@ with u.get_session() as session:
 
 ##### 定义异步任务
 
+建立workers.app_name.task.py用于编写远程任务
+建立workers.app_name.callback.py用于编写远程回调
+task.py任务示例
+
+```python
+from talos.common import celery
+from talos.common import async_helper
+from cms.workers.app_name import callback
+@celery.app.task
+def add(task_id, x, y):
+    result = x + y
+    # 这里还可以通知其他附加任务
+    async_helper.send_task('cms.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
+   # send callback的参数必须与callback函数参数匹配(request，response除外)
+   async_helper.send_callback(url_base, callback.callback_add,
+                               data,
+                               task_id=task_id)
+   # 此处是异步回调结果，不需要服务器等待或者轮询，worker会主动发送进度或者结果，可以不return
+   # 如果想要使用return方式，则按照正常celery流程编写代码
+   return result
+```
+
+callback.py回调示例
+```python
+from talos.common import async_helper
+# 可以使用函数参数中的任意变量作为url的变量（为了某种情况下作为url区分），当然也可以不用
+@async_helper.callback('/callback/add/{task_id}')
+def callback_add(data, task_id, request=None, response=None):
+    db.save(task_id, result)
+```
+
+route中添加回调
+```python
+from talos.common import async_helper
+from project_name.workers.app_name import callback
+
+def add_route(api):
+    async_helper.add_callback_route(api, callback.callback_add)
+```
+
+启动worker
+  celery -A cms.server.celery_worker worker --autoscale=50,4 --loglevel=DEBUG -Q your_queue_name
+
+调用
+  add('id', 1, 1).delay()
+  会有任务发送到worker中，然后woker会启动一个other_task任务，并回调url将结果发送会服务端
+
 ##### 异步任务配置
 
-##### 结果回调
+依赖：
+​    库：
+​        celery
+
+​    配置：
+
+```
+{
+        ...
+        "celery": {
+            "worker_concurrency": 8,
+            "broker_url": "pyamqp://guest@127.0.0.1//",
+            "result_backend": "redis://127.0.0.1",
+            "imports": [
+                "project_name.workers.app_name.tasks"
+            ],
+            "task_serializer": "json",
+            "result_serializer": "json",
+            "accept_content": ["json"],
+            "worker_prefetch_multiplier": 1,
+            "task_routes": {
+                "project_name.workers.*": {"queue": "your_queue_name",
+                                        "exchange": "your_exchange_name",
+                                        "routing_key": "your_routing_name"}
+            }
+        },
+        "worker": {
+            "callback": {
+                "strict_client": true,
+                "allow_hosts": ["127.0.0.1"]
+            }
+        }
+}
+```
+
+
 
 #### 定时任务[^ 2]
 
@@ -792,9 +874,87 @@ def test(arg):
     print(arg)
 ```
 
-- **频率限制**
+#### 频率限制
 
-- **数据库版本管理**
+独立中间件版见：[falcon_limit](https://github.com/royl88/falcon_limit) , 使用方法完全相同
+
+* 定义Controller
+
+* 使用装饰器装饰要进行rate limit的函数，必须是on\_method的函数
+
+* 启用中间件
+
+##### 静态频率限制(配置/代码)
+
+**函数级的频率限制**
+
+```python
+# coding=utf-8
+
+import falcon
+from talos.common import decorators
+from talos.common import limitwrapper
+
+# 快速自定义一个简单支持GET、POST请求的Controller
+# add_route('/things', ThingsController())
+class ThingsController(object):
+    @deco.limit('1/second')
+    def on_get(self, req, resp):
+        """Handles GET requests, using 1/second limit"""
+        resp.body = ('It works!')
+    def on_post(self, req, resp):
+        """Handles POST requests, using global limit(if any)"""
+        resp.body = ('It works!')
+```
+
+**中间件全局级的频率限制**
+
+```json
+{
+    "rate_limit": {
+        "enabled": true,
+        "storage_url": "memory://",
+        "strategy": "fixed-window",
+        "global_limits": "5/second",
+        "per_method": true,
+        "header_reset": "X-RateLimit-Reset",
+        "header_remaining": "X-RateLimit-Remaining",
+        "header_limit": "X-RateLimit-Limit"
+    }
+}
+```
+
+##### 动态频率限制
+
+以上的频率限制都是预定义的，无法根据具体参数进行动态的更改，而通过重写中间件的get_extra_limits函数，我们可以获得动态追加频率限制的能力
+
+```python
+class MyLimiter(limiter.Limiter):
+    def __init__(self, *args, **kwargs):
+        super(MyLimiter, self).__init__(*args, **kwargs)
+        self.mylimits = {'cms.apps.test1': [wrapper.LimitWrapper('2/second')]}
+    def get_extra_limits(self, request, resource, params):
+        if request.method.lower() == 'post':
+            return self.mylimits['cms.apps.test1']
+
+```
+
+频率限制默认被加载在了系统的中间件中，如果不希望重复定义中间件，可以在cms.server.wsgi_server中修改项目源代码：
+
+```python
+application = base.initialize_server('cms',
+                                     ...
+                                     middlewares=[
+                                         globalvars.GlobalVars(),
+                                         MyLimiter(),
+                                         json_translator.JSONTranslator()],
+                                     override_middlewares=True)
+```
+
+
+
+
+#### 数据库版本管理
 
 
 
