@@ -94,10 +94,8 @@ class LengthValidator(NullValidator):
         self.maximum = maximum
 
     def validate(self, value):
-        try:
-            len(value)
-        except TypeError:
-            return _('object of type %(type)s has no length') % {'type': type(value).__name__}
+        if not (utils.is_string_type(value) or utils.is_list_type(value)):
+            return _('expected string or list to calculate length, not %(type)s ') % {'type': type(value).__name__}
         if self.minimum <= len(value) and len(value) <= self.maximum:
             return True
         return _('length required: %(min)d <= %(value)d <= %(max)d') % {'min': self.minimum, 'value': len(value), 'max': self.maximum}
@@ -112,7 +110,7 @@ class TypeValidator(NullValidator):
     def validate(self, value):
         if isinstance(value, self.types):
             return True
-        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join(self.types)}
+        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self.types])}
 
 
 class NumberValidator(NullValidator):
@@ -130,7 +128,7 @@ class NumberValidator(NullValidator):
             if self.range_max is not None and self.range_max < value:
                 return _('number range max required < %(max)d') % {'max': self.range_max}
             return True
-        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join(self.types)}
+        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self.types])}
 
 
 class InValidator(NullValidator):
