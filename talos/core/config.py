@@ -191,17 +191,12 @@ CONFIG_OPTS = {
         'backlog': 2048,
     },
     'log': {
-        'gunicorn_access': UNSET,
-        'gunicorn_error': UNSET,
+        'gunicorn_access': './access.log',
+        'gunicorn_error': './error.log',
         'path': './server.log',
         'level': 'INFO',
         'format_string': '%(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s',
         'date_format_string': '%Y-%m-%d %H:%M:%S',
-        # 'loggers': [
-        #     {'name': 'talos.apps.app_name',
-        #      'path': './server2.log',
-        #      'level': 'INFO', }
-        # ]
     },
     'db': {
         'connection': UNSET,
@@ -211,7 +206,7 @@ CONFIG_OPTS = {
         'max_overflow': 5,
     },
     'cache': {
-        'type': UNSET,
+        'type': 'dogpile.cache.memory',
         'expiration': 3600
     },
     'application': {
