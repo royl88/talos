@@ -14,6 +14,7 @@ import re
 import falcon
 
 from talos.core import config
+from talos.core import exceptions
 from talos.core import utils
 from talos.core.i18n import _
 
@@ -236,7 +237,7 @@ class ItemController(Controller):
         if ref is not None:
             resp.json = ref
         else:
-            resp.status = falcon.HTTP_404
+            raise exceptions.NotFoundError(resource=self.resource.__name__)
 
     def get(self, req, **kwargs):
         """
@@ -264,7 +265,7 @@ class ItemController(Controller):
         if ref_after is not None:
             resp.json = ref_after
         else:
-            resp.status = falcon.HTTP_404
+            raise exceptions.NotFoundError(resource=self.resource.__name__)
 
     def update(self, req, data, **kwargs):
         """
@@ -293,9 +294,9 @@ class ItemController(Controller):
         self._validate_method(req)
         ref, details = self.delete(req, **kwargs)
         if ref:
-            resp.json = {'count': ref}
+            resp.json = {'count': ref, 'data': details}
         else:
-            resp.status = falcon.HTTP_404
+            raise exceptions.NotFoundError(resource=self.resource.__name__)
 
     def delete(self, req, **kwargs):
         """
