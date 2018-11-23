@@ -46,6 +46,7 @@ def input_var_with_check(prompt, rule=None, max_try=3):
 
 def render(source_code, output_file, **kwargs):
     with open(output_file, 'wb') as f_target:
+        kwargs['sys_default_coding'] = '# coding=utf-8'
         content = Template(source_code, output_encoding='utf-8').render(**kwargs)
         f_target.write(content)
 

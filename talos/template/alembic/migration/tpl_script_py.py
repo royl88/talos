@@ -1,6 +1,6 @@
 # coding=utf-8
 
-TEMPLATE = u'''# coding=utf-8
+TEMPLATE = u'''${sys_default_coding}
 
 <%text>
 """

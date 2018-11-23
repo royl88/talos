@@ -7,11 +7,11 @@ TEMPLATE = u'''{
     "language": "en",
     "server": {
         "bind": "0.0.0.0",
-        "port": 9001
+        "port": 9000
     },
     "log": {
-    	"gunicorn_access": "/var/log/${pkg_name}/access.log",
-    	"gunicorn_error": "/var/log/${pkg_name}/error.log",
+    	"gunicorn_access": "./access.log",
+    	"gunicorn_error": "./error.log",
         "path": "./server.log",
         "level": "INFO",
         "format_string": "%(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s",
