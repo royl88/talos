@@ -17,7 +17,6 @@ from talos.core import decorators as deco
 CONF = config.CONF
 
 
-@deco.singleton
 class DBPool(object):
     """数据库连接池，单例模式"""
 
@@ -85,4 +84,12 @@ class DBPool(object):
         return True
 
 
-POOL = DBPool()
+@deco.singleton
+class DefaultDBPool(DBPool):
+    '''
+    默认db配置用的单例数据库连接池
+    '''
+    pass
+
+
+POOL = DefaultDBPool()
