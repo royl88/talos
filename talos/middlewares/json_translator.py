@@ -45,5 +45,5 @@ class JSONTranslator(object):
         """在业务逻辑之后，对每个请求返回数据格式化为json"""
         if not hasattr(resp, 'json'):
             return
-        req.content_type = 'application/json'
+        resp.content_type = 'application/json'
         resp.body = json.dumps(resp.json, cls=utils.ComplexEncoder)
