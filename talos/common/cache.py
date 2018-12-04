@@ -35,19 +35,42 @@ from talos.core import config
 
 
 CONF = config.CONF
-CACHE = make_region().configure(
-    CONF.cache.type,  # dogpile.cache.redis
-    expiration_time=CONF.cache.expiration_time or 3600,
-    arguments=CONF.cache.arguments.to_dict()
-    #     {
-    #         'host': 'localhost',
-    #         'password': '',
-    #         'port': 6379,
-    #         'db': 0,
-    #         'redis_expiration_time': 60*60*2,   # 2 hours
-    #         'distributed_lock': True
-    #     }
-)
+
+
+class CacheProxy(object):
+    def __init__(self):
+        self.cache = None
+
+    def __getattr__(self, name):
+        """
+        魔法函数，实现.操作符访问
+
+        :param name: 配置项
+        :type name: string
+        :returns: 原属性
+        :rtype: any
+        :raises: KeyError
+        """
+        if self.cache is None:
+            self.cache = make_region().configure(
+                # dogpile.cache.redis, dogpile.cache.memory
+                CONF.cache.type,
+                expiration_time=CONF.cache.expiration_time or 3600,
+                #  for redis
+                #     {
+                #         'host': 'localhost',
+                #         'password': '',
+                #         'port': 6379,
+                #         'db': 0,
+                #         'redis_expiration_time': 60*60*2,   # 2 hours
+                #         'distributed_lock': True
+                #     }
+                arguments=CONF.cache.arguments.to_dict()
+            )
+        return getattr(self.cache, name)
+
+
+CACHE = CacheProxy()
 
 
 def validate(value):
