@@ -953,27 +953,194 @@ application = base.initialize_server('cms',
 
 
 
-
 #### 数据库版本管理
 
+修改models.py为最终目标表模型，运行命令：
 
+alembic revision --autogenerate -m "add table: xxxxx"
+
+备注不支持中文, autogenerate用于生成upgrade，downgrade函数内容，不指定则为pass，检查升级降级函数是否正确
+
+升级：alembic upgrade head
+
+降级：alembic downgrade base
+
+head指最新版本，base指最原始版本即当前models - all version，更多升级降级方式如下：
+
+- alembic upgrade +2 升级2个版本
+
+- alembic downgrade -1 回退一个版本
+
+- alembic upgrade ae10+2 升级到ae1027a6acf+2个版本
+
+
+#### 单元测试
+
+talos生成的项目预置了一些依赖要求，可以更便捷的使用pytest进行单元测试，如需了解更详细的单元测试编写指导，请查看pytest文档
+
+> python setup.py test
+
+可以简单从命令行输出中查看结果，或者从unit_test_report.html查看单元测试报告，从htmlcov/index.html中查看覆盖测试报告结果
+
+
+
+## Sphinx注释文档
+
+Sphinx的注释格式这里不再赘述，可以参考网上文档教程，talos内部使用的注释文档格式如下：
+
+```
+    """
+    函数注释文档
+
+    :param value: 参数描述
+    :type value: 参数类型
+    :returns: 返回值描述
+    :rtype: `bytes`/`str` 返回值类型
+    """
+```
+
+
+
+- 安装sphinx
+
+- 在工程目录下运行sphinx-quickstart
+
+  - root path for the documentation [.]: docs
+  - Project name: cms
+  - Author name(s): Roy
+  - Project version []: 1.0.0
+  - Project language [en]: zh_cn
+  - autodoc: automatically insert docstrings from modules (y/n) [n]: y
+
+- 可选的风格主题，推荐sphinx_rtd_theme，需要pip install sphinx_rtd_theme
+
+- 修改docs/conf.py
+
+  ```python
+  # import os
+  # import sys
+  # sys.path.insert(0, os.path.abspath('.'))
+  import os
+  import sys
+  sys.path.insert(0, os.path.abspath('..'))
+  
+  import sphinx_rtd_theme
+  html_theme = "sphinx_rtd_theme"
+  html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+  ```
+
+- 生成apidoc sphinx-apidoc -o docs/ ./cms
+
+- 生成html：
+
+  - cd docs
+  - make.bat html
+  - 打开docs/_build/html/index.html
 
 ## 国际化i18n
 
+同样以cms项目作为例子
+
 ### 提取待翻译
+
+```bash
+# 需要翻译项目的语言
+find /usr/lib/python2.7/site-packages/cms/ -name "*.py" >POTFILES.in
+# 需要翻译talos的语言
+find /usr/lib/python2.7/site-packages/talos/ -name "*.py" >>POTFILES.in
+# 提取为cms.po
+xgettext --default-domain=cms --add-comments --keyword=_ --keyword=N_ --files-from=POTFILES.in --from-code=UTF8
+```
+
+
 
 ### 合并已翻译
 
+```bash
+msgmerge cms-old.po cms.po -o cms.po
+```
+
+
+
 ### 翻译
+
+可以使用如Poedit的工具帮助翻译
+
+(略)
 
 ### 编译发布
 
+Windows：使用Poedit工具，则点击保存即可生成cms.mo文件
+
+Linux：msgfmt --output-file=cms.mo cms.po
+
+将mo文件发布到
+
+/etc/fitportal/locale/$lang/LC_MESSAGES/
+
+$lang即配置项中的language
 
 
 
+## 配置项
+
+talos中预置了很多控制程序行为的配置项，可以允许用户进行相关的配置：全局配置、启动服务配置、日志配置、数据库连接配置、缓存配置、频率限制配置、异步和回调配置
+
+| 路径                                   | 类型   | 描述                                                         | 默认值                                                       |
+| -------------------------------------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| host                                   | string | 主机名                                                       | 当前主机名                                                   |
+| language                               | string | 系统语言翻译                                                 | en                                                           |
+| locale_app                             | string | 国际化locale应用名称                                         | 当前项目名                                                   |
+| locale_path                            | string | 国际化locale文件路径                                         | ./etc/locale                                                 |
+| global_list_size_limit_enabled         | bool   | 是否启用全局列表大小限制                                     | False                                                        |
+| global_list_size_limit                 | int    | 全局列表大小                                                 | None                                                         |
+| override_defalut_middlewares           | bool   | 覆盖系统默认加载的中间件                                     | Flase                                                        |
+| server                                 | dict   | 服务监听配置项                                               |                                                              |
+| server.bind                            | string | 监听地址                                                     | 0.0.0.0                                                      |
+| server.port                            | int    | 监听端口                                                     | 9001                                                         |
+| server.backlog                         | int    | 监听最大队列数                                               | 2048                                                         |
+| log                                    | dict   | 日志配置项                                                   |                                                              |
+| log.gunicorn_access                    | string | gunicorn的access日志路径                                     | ./access.log                                                 |
+| log.gunicorn_error                     | string | gunicorn的error日志路径                                      | ./error.log                                                  |
+| log.path                               | string | 全局日志路径                                                 | ./server.log                                                 |
+| log.level                              | string | 日志级别                                                     | INFO                                                         |
+| log.format_string                      | string | 日志字段配置                                                 | %(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s |
+| log.date_format_string                 | string | 日志时间格式                                                 | %Y-%m-%d %H:%M:%S                                            |
+| log.loggers                            | list   | 模块独立日志配置，列表每个元素是dict                         |                                                              |
+| log.loggers.name                       | string | 模块名称路径，如cms.apps.test                                |                                                              |
+| log.loggers.level                      | string | 日志级别                                                     |                                                              |
+| log.loggers.path                       | string | 日志路径                                                     |                                                              |
+| db                                     | dict   | 数据库配置项                                                 |                                                              |
+| db.connection                          | string | 连接字符串                                                   |                                                              |
+| db.pool_size                           | int    | 连接池大小                                                   | 3                                                            |
+| db.pool_recycle                        | int    | 连接最大空闲时间，超过时间后自动回收                         | 3600                                                         |
+| db.pool_timeout                        | int    | 获取连接超时时间，单位秒                                     | 5                                                            |
+| db.max_overflow                        | int    | 突发连接池扩展大小                                           | 5                                                            |
+| cache                                  | dict   | 缓存配置项                                                   |                                                              |
+| cache.type                             | string | 缓存后端类型                                                 | dogpile.cache.memory                                         |
+| cache.expiration                       | int    | 缓存默认超时时间，单位为秒                                   | 3600                                                         |
+| application                            | dict   |                                                              |                                                              |
+| application.names                      | list   | 加载的应用列表，每个元素为string，代表加载的app路径          | []                                                           |
+| rate_limit                             | dict   | 频率限制配置项                                               |                                                              |
+| rate_limit.enabled                     | bool   | 是否启用频率限制                                             | False                                                        |
+| rate_limit.storage_url                 | string | 频率限制数据存储计算后端                                     | memory://                                                    |
+| rate_limit.strategy                    | string | 频率限制算法，可选fixed-window，fixed-window-elastic-expiry，moving-window | fixed-window                                                 |
+| rate_limit.global_limits               | string | 全局频率限制(依赖于全局中间件)，eg. 1/second; 5/minute       | None                                                         |
+| rate_limit.per_method                  | bool   | 是否为每个HTTP方法独立频率限制                               | True                                                         |
+| rate_limit.header_reset                | string | HTTP响应头，频率重置时间                                     | X-RateLimit-Reset                                            |
+| rate_limit.header_remaining            | string | HTTP响应头，剩余的访问次数                                   | X-RateLimit-Remaining                                        |
+| rate_limit.header_limit                | string | HTTP响应头，最大访问次数                                     | X-RateLimit-Limit                                            |
+| celery                                 | dict   | 异步任务配置项                                               |                                                              |
+| celery.talos_on_user_schedules_changed | list   | 定时任务变更判断函数列表"talos_on_user_schedules_changed":["cms.workers.hooks:ChangeDetection"], |                                                              |
+| celery.talos_on_user_schedules         | list   | 定时任务函数列表"talos_on_user_schedules": ["cms.workers.hooks:AllSchedules"] |                                                              |
+| worker                                 | dict   | 异步工作进程配置项                                           |                                                              |
+| worker.callback                        | dict   | 异步工作进程回调控制配置项                                   |                                                              |
+| worker.callback.strict_client          | bool   | 异步工作进程认证时仅使用直连IP                               | True                                                         |
+| worker.callback.allow_hosts            | list   | 异步工作进程认证主机IP列表，当设置时，仅允许列表内worker调用回调 | None                                                         |
+| worker.callback.name.%s.allow_hosts    | list   | 异步工作进程认证时，仅允许列表内worker调用此命名回调         | None                                                         |
 
 
 
-[^1]: 本文档基于v1.1.8版本
+[^1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
