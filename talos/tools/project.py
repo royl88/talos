@@ -188,7 +188,7 @@ def create_project(dest_path, name, version, author, author_email, config_dir, d
     config_file = os.path.join(config_dir, name + '.conf')
     config_dir = config_file + '.d'
     # 初始化python标准包文件
-    initialize_package(dest_path, name, version, author, author_email)
+    initialize_package(dest_path, name, author, author_email, version)
     print(u"### 创建项目：%s(%s)通用文件 " % (name, version))
     # 初始化server目录
     initialize_server(dest_path, name, config_file, config_dir)
