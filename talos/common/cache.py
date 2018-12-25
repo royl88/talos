@@ -32,6 +32,7 @@ from __future__ import absolute_import
 from dogpile.cache import make_region
 from dogpile.cache.api import NO_VALUE
 from talos.core import config
+from talos.core import utils
 
 
 CONF = config.CONF
@@ -65,7 +66,8 @@ class CacheProxy(object):
                 #         'redis_expiration_time': 60*60*2,   # 2 hours
                 #         'distributed_lock': True
                 #     }
-                arguments=CONF.cache.arguments.to_dict()
+                arguments=CONF.cache.arguments.to_dict() if \
+                utils.get_config(CONF, 'cache.arguments', None) is not None else None
             )
         return getattr(self.cache, name)
 
