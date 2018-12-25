@@ -184,7 +184,7 @@ class CollectionController(Controller):
         """
         # 如果用户没有设置limit并且程序中自带了size limit则使用默认limit值
         # 若都没有设置，则检测全局配置是否启用并设置
-        if 'limit' not in criteria:
+        if criteria.get('limit', None) is None:
             if self.list_size_limit is not None:
                 criteria['limit'] = self.list_size_limit
             elif CONF.global_list_size_limit_enabled and CONF.global_list_size_limit is not None:
