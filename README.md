@@ -1118,7 +1118,8 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | db.max_overflow                        | int    | 突发连接池扩展大小                                           | 5                                                            |
 | cache                                  | dict   | 缓存配置项                                                   |                                                              |
 | cache.type                             | string | 缓存后端类型                                                 | dogpile.cache.memory                                         |
-| cache.expiration                       | int    | 缓存默认超时时间，单位为秒                                   | 3600                                                         |
+| cache.expiration_time                  | int    | 缓存默认超时时间，单位为秒                                   | 3600                                                         |
+| cache.arguments                        | dict   | 缓存额外配置                                                 | None                                                         |
 | application                            | dict   |                                                              |                                                              |
 | application.names                      | list   | 加载的应用列表，每个元素为string，代表加载的app路径          | []                                                           |
 | rate_limit                             | dict   | 频率限制配置项                                               |                                                              |
