@@ -7,8 +7,11 @@
 from __future__ import absolute_import
 
 from email.mime.image import MIMEImage
+from email.mime.audio import MIMEAudio
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import mimetypes
 import logging
 import os
 import re
@@ -132,33 +135,32 @@ class Mailer(object):
         self.password = password
 
     def mail_to(self,
-                mail_from,
-                mail_to,
-                mail_cc,
                 subject,
                 message,
+                mail_from,
+                mail_to,
+                mail_cc=None,
                 mail_bcc=None,
-                attchments=None,
+                attachments=None,
                 message_type='plain',
                 message_charset='utf8',
                 max_recevier=None):
         """
-
+        :param subject: 邮件主题
+        :type subject: str
+        :param message: 邮件内容
+        :type message: str
         :param mail_from: 发件人邮件地址
         :type mail_from: str
         :param mail_to: 收件人，地址字符串为元素的列表
         :type mail_to: list
         :param mail_cc: 抄送人，地址字符串为元素的列表 or None
         :type mail_cc: list
-        :param subject: 邮件主题
-        :type subject: str
-        :param message: 邮件内容
-        :type message: str
         :param mail_bcc: 秘密抄送，地址字符串为元素的列表 or None
         :type mail_bcc: list
-        :param attchments: 附件列表
-        :type attchments: str/list
-        :param message_type: 邮件内容格式，如text，html
+        :param attachments: 附件列表
+        :type attachments: str/list
+        :param message_type: 邮件内容格式，如plain，text，html
         :type message_type: str
         :param message_charset: 邮件内容编码，如utf8，gbk
         :type message_charset: str
@@ -168,56 +170,72 @@ class Mailer(object):
         :rtype: bool
         """
         msg = MIMEMultipart()
-        msg['Subject'] = subject
         msg['From'] = mail_from
-        fix_mail_to = []
+        msg['Subject'] = subject
+        all_recipients = []
+        # 设置普通收件人
         msg['To'] = to_address_string(mail_to)
-        fix_mail_to.extend(mail_to)
+        all_recipients.extend(mail_to)
+        # 设置抄送收件人
         if mail_cc:
             msg['Cc'] = to_address_string(mail_cc)
-            fix_mail_to.extend(mail_cc)
+            all_recipients.extend(mail_cc)
+        # 设置密件抄送收件人
         if mail_bcc:
             msg['Bcc'] = to_address_string(mail_bcc)
-            fix_mail_to.extend(mail_bcc)
+            all_recipients.extend(mail_bcc)
+        # 设置邮件正文
         message = utils.ensure_unicode(message)
         body = MIMEText(message, _subtype=message_type, _charset=message_charset)
         msg.attach(body)
-        attchments = attchments or []
-        if utils.is_string_type(attchments):
-            attchments = [attchments]
-        for filename in attchments:
-            with open(filename, 'rb') as f:
-                if filename.endswith('.jpg') or filename.endswith('.png') or filename.endswith('.gif')\
-                   or filename.endswith('.jpeg'):
-                    attchment = MIMEImage(f.read())
-                    attchment['Content-ID'] = os.path.basename(filename).split('.')[0]
-                    msg.attach(attchment)
+        attachments = attachments or []
+        if utils.is_string_type(attachments):
+            attachments = [attachments]
+        for filename in attachments:
+            if utils.is_string_type(filename):
+                # 猜测附件类型
+                attachment_type, attachment_encoding = mimetypes.guess_type(filename)
+                # 图片附件
+                if attachment_type is not None and attachment_type.startswith('image/'):
+                    with open(filename, 'rb') as f:
+                        attchment = MIMEImage(f.read())
+                        attchment['Content-ID'] = os.path.basename(filename).split('.')[0]
+                        msg.attach(attchment)
+                # 音频附件
+                elif attachment_type is not None and attachment_type.startswith('audio/'):
+                    with open(filename, 'rb') as f:
+                        attchment = MIMEAudio(f.read())
+                        attchment['Content-ID'] = os.path.basename(filename).split('.')[0]
+                        msg.attach(attchment)
+                # 二进制流附件
                 else:
-                    attchment = MIMEText(f.read(), 'base64', message_charset)
-                    attchment['Content-Type'] = 'application/octet-stream'
-                    attchment['Content-Disposition'] = 'attachment; filename="%s"' % os.path.basename(filename)
-                    msg.attach(attchment)
+                    with open(filename, 'rb') as f:
+                        attchment = MIMEApplication(f.read())
+                        attchment['Content-Type'] = 'application/octet-stream'
+                        attchment['Content-Disposition'] = 'attachment; filename="%s"' % os.path.basename(filename)
+                        msg.attach(attchment)
         try:
             smtp = smtplib.SMTP()
             smtp.connect(self.host)
             if self.username is not None and self.password is not None:
                 smtp.login(self.username, self.password)
-            LOG.info('email as string: %s', msg.as_string())
-            if max_recevier and len(fix_mail_to) > max_recevier:
-                ranger = range(len(fix_mail_to))[::max_recevier]
+            LOG.debug('email as string: %s', msg.as_string())
+            if max_recevier and len(all_recipients) > max_recevier:
+                ranger = range(len(all_recipients))[::max_recevier]
+                # 分批发送收件人
                 for n in range(len(ranger) - 1):
-                    LOG.info('sending email to : %s', fix_mail_to[ranger[n]:ranger[n + 1]])
-                    result = smtp.sendmail(mail_from, fix_mail_to[ranger[n]:ranger[n + 1]], msg.as_string())
+                    LOG.info('sending email to : %s', all_recipients[ranger[n]:ranger[n + 1]])
+                    result = smtp.sendmail(mail_from, all_recipients[ranger[n]:ranger[n + 1]], msg.as_string())
                     if len(result) > 0:
                         LOG.error('failed to mail recipient: %s', result)
-                if len(fix_mail_to) % max_recevier != 0:
-                    # recipient left
-                    LOG.info('sending email to : %s', fix_mail_to[ranger[-1]:])
-                    result = smtp.sendmail(mail_from, fix_mail_to[ranger[-1]:], msg.as_string())
+                if len(all_recipients) % max_recevier != 0:
+                    # 剩余收件人
+                    LOG.info('sending email to : %s', all_recipients[ranger[-1]:])
+                    result = smtp.sendmail(mail_from, all_recipients[ranger[-1]:], msg.as_string())
                     if len(result) > 0:
                         LOG.error('failed to email recipient: %s', result)
             else:
-                result = smtp.sendmail(mail_from, fix_mail_to, msg.as_string())
+                result = smtp.sendmail(mail_from, all_recipients, msg.as_string())
                 if len(result) > 0:
                     LOG.error('failed to email recipient: %s', result)
             smtp.quit()
