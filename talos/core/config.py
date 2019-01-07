@@ -186,7 +186,7 @@ CONFIG_OPTS = {
     'global_list_size_limit_enabled': False,
     'global_list_size_limit': None,
     'override_defalut_middlewares': False,
-    'criteria_transform_enabled': True,
+    'strict_criteria_transform': False,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
