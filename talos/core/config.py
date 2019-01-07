@@ -34,6 +34,7 @@ class Config(Mapping):
         :type ignore_undefined: bool
         :raises: ValueError
         """
+
         def _update(data_src, data_dst, ignore_undefined):
             if ignore_undefined:
                 for key, value in data_src.items():
@@ -185,6 +186,7 @@ CONFIG_OPTS = {
     'global_list_size_limit_enabled': False,
     'global_list_size_limit': None,
     'override_defalut_middlewares': False,
+    'criteria_transform_enabled': True,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
@@ -228,6 +230,5 @@ CONFIG_OPTS = {
     }
 
 }
-
 
 CONF = Configuration(None)
