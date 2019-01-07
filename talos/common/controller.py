@@ -18,7 +18,6 @@ from talos.core import exceptions
 from talos.core import utils
 from talos.core.i18n import _
 
-
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
@@ -50,6 +49,7 @@ class Controller(object):
         :returns: {'filters': filters, 'offset': offset, 'limit': limit}
         :rtype: dict
         """
+
         def _glob_match(pattern_filters, name):
             if pattern_filters is None or name in pattern_filters:
                 return True
@@ -79,10 +79,15 @@ class Controller(object):
                 strip_query_dict[key] = value
         query_dict = strip_query_dict
         filter_mapping = {'contains': 'like', 'icontains': 'ilike',  # include
-                          'istartswith': 'istarts', 'startswith': 'starts',
-                          'iendswith': 'iends', 'endswith': 'ends',
-                          'in': 'in', 'notin': 'nin', 'notequal': 'ne', 'equal': 'eq',  # value compare
-                          'less': 'lt', 'lessequal': 'lte', 'greater': 'gt', 'greaterequal': 'gte'}
+                          'istartswith': 'istarts', 'startswith': 'starts',  # starts with
+                          'iendswith': 'iends', 'endswith': 'ends',  # ends with
+                          'in': 'in', 'notin': 'nin',  # in options
+                          'notequal': 'ne', 'equal': 'eq',  # =, !=
+                          'less': 'lt', 'lessequal': 'lte', 'greater': 'gt', 'greaterequal': 'gte',  # <,<=,>,>=
+                          # NOTE(wujj): new in v1.1.9
+                          'excludes': 'notlike', 'iexcludes': 'inotlike',  # exclude
+                          'notnull': 'nnull', 'null': 'null',  # !=None, None
+                          }
         filters = {}
         offset = None
         limit = None

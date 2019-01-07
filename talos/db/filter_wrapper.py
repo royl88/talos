@@ -92,6 +92,7 @@ def cast(column, value):
 
 
 class Filter(object):
+
     def make_empty_query(self, query, column):
         query = query.filter(column == None)
         query = query.filter(column != None)
@@ -183,6 +184,12 @@ class Filter(object):
             column = cast(column, value)
         query = query.filter(column.like('%%%s' % value))
         return query
+    
+    def op_notlike(self, query, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        query = query.filter(column.notlike('%%%s%%' % value))
+        return query
 
     def op_ilike(self, query, column, value):
         if isinstance(column, BinaryExpression):
@@ -200,6 +207,20 @@ class Filter(object):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
         query = query.filter(column.ilike('%%%s' % value))
+        return query
+    
+    def op_inotlike(self, query, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        query = query.filter(column.notilike('%%%s%%' % value))
+        return query
+    
+    def op_nnull(self, query, column, value):
+        query = query.filter(column != None)
+        return query
+    
+    def op_null(self, query, column, value):
+        query = query.filter(column == None)
         return query
 
 
