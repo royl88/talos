@@ -62,12 +62,14 @@ class Controller(object):
             return False
         
         def _transform_comparator(mappings, comparator):
-            if CONF.criteria_transform_enabled:
+            if CONF.strict_criteria_transform:
                 return mappings.get(comparator, None)
-            elif comparator in mappings:
-                return comparator
             else:
-                return None
+                if comparator in mappings:
+                    return mappings['comparator']
+                elif comparator in mappings.values():
+                    return comparator
+            return None
 
         query_dict = {}
         reg = re.compile('^(.+)\[(\d+)\]$')

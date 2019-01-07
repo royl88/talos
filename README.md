@@ -1094,6 +1094,7 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | locale_path                            | string | 国际化locale文件路径                                         | ./etc/locale                                                 |
 | global_list_size_limit_enabled         | bool   | 是否启用全局列表大小限制                                     | False                                                        |
 | global_list_size_limit                 | int    | 全局列表大小                                                 | None                                                         |
+| strict_criteria_transform              | bool   | 是否使用严格查询条件模式                                      | Flase                                                        |
 | override_defalut_middlewares           | bool   | 覆盖系统默认加载的中间件                                     | Flase                                                        |
 | server                                 | dict   | 服务监听配置项                                               |                                                              |
 | server.bind                            | string | 监听地址                                                     | 0.0.0.0                                                      |
