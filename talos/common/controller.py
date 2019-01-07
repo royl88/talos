@@ -44,7 +44,10 @@ class Controller(object):
 
         :param req: 请求对象
         :type req: Request
-        :param supported_filters: 支持参数过滤，若设置，则只允许特定字段的过滤
+        :param supported_filters: 支持参数过滤，若设置，则只允许特定字段的过滤,
+                                   ['col']意味着所有的col，col__cond查询都支持，
+                                   ['col__in']意味着col仅支持in查询
+                                   ['col__*']意味着col支持所有带条件查询
         :type supported_filters: list
         :returns: {'filters': filters, 'offset': offset, 'limit': limit}
         :rtype: dict
@@ -57,6 +60,14 @@ class Controller(object):
                 if fnmatch.fnmatch(name, pattern_filter):
                     return True
             return False
+        
+        def _transform_comparator(mappings, comparator):
+            if CONF.criteria_transform_enabled:
+                return mappings.get(comparator, None)
+            elif comparator in mappings:
+                return comparator
+            else:
+                return None
 
         query_dict = {}
         reg = re.compile('^(.+)\[(\d+)\]$')
@@ -106,31 +117,35 @@ class Controller(object):
             else:
                 orders = [orders.strip()]
         for key in query_dict:
-            # 没有指定支持filters或者是支持的filter，并且key是简单条件
+            # 没有指定支持filters 或者 明确支持的filter且完全匹配
             if supported_filters is None or key in supported_filters:
                 keys = key.split('__', 1)
+                # key 是简单条件
                 if len(keys) == 1:
                     filters[key] = query_dict[key]
+                # key 是复杂条件
                 else:
                     base_key, comparator = keys[0], keys[1]
-                    comparator = filter_mapping.get(comparator, None)
+                    comparator = _transform_comparator(filter_mapping, comparator)
                     if comparator:
                         if base_key in filters and isinstance(filters[base_key], dict):
                             filters[base_key].update({comparator: query_dict[key]})
                         else:
                             filters[base_key] = {comparator: query_dict[key]}
-                continue
-            # key是一个复杂条件
-            for valid_key in supported_filters:
-                if not key.startswith(valid_key + '__'):
-                    continue
-                base_key, comparator = key.split('__', 1)
-                comparator = filter_mapping.get(comparator, None)
-                if comparator and _glob_match(supported_filters, base_key):
-                    if base_key in filters and isinstance(filters[base_key], dict):
-                        filters[base_key].update({comparator: query_dict[key]})
-                    else:
-                        filters[base_key] = {comparator: query_dict[key]}
+            # 用户明确支持的filter 且 传入key不在此列表中，需要组合推测是否符合用户要求
+            else:
+                for valid_key in supported_filters:
+                    # 非复杂查询条件，
+                    if not key.startswith(valid_key + '__'):
+                        continue
+                    base_key, comparator = key.split('__', 1)
+                    comparator = _transform_comparator(filter_mapping, comparator)
+                    # 支持unix shell匹配条件
+                    if comparator and _glob_match(supported_filters, base_key):
+                        if base_key in filters and isinstance(filters[base_key], dict):
+                            filters[base_key].update({comparator: query_dict[key]})
+                        else:
+                            filters[base_key] = {comparator: query_dict[key]}
         return {'filters': filters, 'offset': offset, 'limit': limit, 'orders': orders}
 
     def make_resource(self, req):
