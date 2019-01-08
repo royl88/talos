@@ -22,6 +22,15 @@ LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
 
+class SimplifyMixin(object):
+
+    def _simplify_info(self, data, fields):
+        info = {}
+        for f in fields:
+            info[f] = data.get(f)
+        return info
+
+
 class Controller(object):
     name = None
     resource = None
@@ -105,6 +114,7 @@ class Controller(object):
         offset = None
         limit = None
         orders = None
+        fields = None
 
         if query_dict is None:
             return filters, offset, limit
@@ -118,6 +128,12 @@ class Controller(object):
                 orders = [order.strip() for order in orders]
             else:
                 orders = [orders.strip()]
+        if '__fields' in query_dict:
+            fields = query_dict.pop('__fields')
+            if utils.is_list_type(fields):
+                fields = [f.strip() for f in fields]
+            else:
+                fields = [fields.strip()]
         for key in query_dict:
             # 没有指定支持filters 或者 明确支持的filter且完全匹配
             if supported_filters is None or key in supported_filters:
@@ -148,13 +164,13 @@ class Controller(object):
                             filters[base_key].update({comparator: query_dict[key]})
                         else:
                             filters[base_key] = {comparator: query_dict[key]}
-        return {'filters': filters, 'offset': offset, 'limit': limit, 'orders': orders}
+        return {'filters': filters, 'offset': offset, 'limit': limit, 'orders': orders, 'fields': fields}
 
     def make_resource(self, req):
         return self.resource()
 
 
-class CollectionController(Controller):
+class CollectionController(Controller, SimplifyMixin):
     """集合控制器"""
     allow_methods = ('GET', 'POST',)
 
@@ -191,6 +207,7 @@ class CollectionController(Controller):
         criteria.pop('offset')
         criteria.pop('limit')
         criteria.pop('orders')
+        criteria.pop('fields')
         return self.make_resource(req).count(**criteria)
 
     def list(self, req, criteria, **kwargs):
@@ -211,7 +228,11 @@ class CollectionController(Controller):
                 criteria['limit'] = self.list_size_limit
             elif CONF.global_list_size_limit_enabled and CONF.global_list_size_limit is not None:
                 criteria['limit'] = CONF.global_list_size_limit
-        return self.make_resource(req).list(**criteria)
+        fields = criteria.pop('fields')
+        refs = self.make_resource(req).list(**criteria)
+        if fields is not None:
+            refs = [self._simplify_info(ref, fields) for ref in refs]
+        return refs
 
     def on_post(self, req, resp, **kwargs):
         """
@@ -241,7 +262,7 @@ class CollectionController(Controller):
         return self.make_resource(req).create(data)
 
 
-class ItemController(Controller):
+class ItemController(Controller, SimplifyMixin):
     """单项资源控制器"""
     allow_methods = ('GET', 'PATCH', 'DELETE')
 
