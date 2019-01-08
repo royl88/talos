@@ -66,7 +66,7 @@ class Controller(object):
                 return mappings.get(comparator, None)
             else:
                 if comparator in mappings:
-                    return mappings['comparator']
+                    return mappings[comparator]
                 elif comparator in mappings.values():
                     return comparator
             return None
