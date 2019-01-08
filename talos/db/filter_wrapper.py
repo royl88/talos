@@ -185,7 +185,7 @@ class Filter(object):
         query = query.filter(column.like('%%%s' % value))
         return query
     
-    def op_notlike(self, query, column, value):
+    def op_nlike(self, query, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
         query = query.filter(column.notlike('%%%s%%' % value))
@@ -209,7 +209,7 @@ class Filter(object):
         query = query.filter(column.ilike('%%%s' % value))
         return query
     
-    def op_inotlike(self, query, column, value):
+    def op_nilike(self, query, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
         query = query.filter(column.notilike('%%%s%%' % value))
@@ -338,6 +338,9 @@ class FilterNetwork(Filter):
 
     def op_like(self, query, column, value):
         return query
+    
+    def op_nlike(self, query, column, value):
+        return query
 
     def op_starts(self, query, column, value):
         return query
@@ -346,6 +349,9 @@ class FilterNetwork(Filter):
         return query
 
     def op_ilike(self, query, column, value):
+        return query
+    
+    def op_nilike(self, query, column, value):
         return query
 
     def op_istarts(self, query, column, value):
@@ -398,6 +404,9 @@ class FilterNumber(Filter):
 
     def op_like(self, query, column, value):
         return query
+    
+    def op_nlike(self, query, column, value):
+        return query
 
     def op_starts(self, query, column, value):
         return query
@@ -406,6 +415,9 @@ class FilterNumber(Filter):
         return query
 
     def op_ilike(self, query, column, value):
+        return query
+    
+    def op_nilike(self, query, column, value):
         return query
 
     def op_istarts(self, query, column, value):

@@ -97,8 +97,8 @@ class Controller(object):
                           'in': 'in', 'notin': 'nin',  # in options
                           'notequal': 'ne', 'equal': 'eq',  # =, !=
                           'less': 'lt', 'lessequal': 'lte', 'greater': 'gt', 'greaterequal': 'gte',  # <,<=,>,>=
-                          # NOTE(wujj): new in v1.1.9
-                          'excludes': 'notlike', 'iexcludes': 'inotlike',  # exclude
+                          # NOTE(wujj): new in v1.2.0
+                          'excludes': 'nlike', 'iexcludes': 'nilike',  # exclude
                           'notnull': 'nnull', 'null': 'null',  # !=None, None
                           }
         filters = {}
