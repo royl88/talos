@@ -259,22 +259,28 @@ id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
 
 更复杂的查询需要通过嵌套dict来实现：{'字段名称': {'过滤条件': '值'}}
 
-| 过滤条件 | 值类型       |
-| -------- | ------------ |
-| in       | list         |
-| nin      | list         |
-| eq       | 根据字段类型 |
-| ne       | 根据字段类型 |
-| lt       | 根据字段类型 |
-| lte      | 根据字段类型 |
-| gt       | 根据字段类型 |
-| gte      | 根据字段类型 |
-| like     | string       |
-| ilike    | string       |
-| starts   | string       |
-| istarts  | string       |
-| ends     | string       |
-| iends    | string       |
+| 过滤条件 | 值类型          | 含义                                                           |
+| -------- | --------------- | -------------------------------------------------------------- |
+| like      | string         | 模糊查询，包含条件                                             |
+| ilike     | string         | 同上，不区分大小写                                             |
+| starts    | string         | 模糊查询，以xxxx开头                                           |
+| istarts   | string         | 同上，不区分大小写                                             |
+| ends      | string         | 模糊查询，以xxxx结尾                                           |
+| iends     | string         | 同上，不区分大小写                                             |
+| in        | list           | 精确查询，条件在列表中                                         |
+| nin       | list           | 精确查询，条件不在列表中                                       |
+| eq        | 根据字段类型   | 等于                                                           |
+| ne        | 根据字段类型   | 不等于                                                         |
+| lt        | 根据字段类型   | 小于                                                           |
+| lte       | 根据字段类型   | 小于等于                                                       |
+| gt        | 根据字段类型   | 大于                                                           |
+| gte       | 根据字段类型   | 大于等于                                                       |
+| nlike     | string         | 模糊查询，不包含                                               |
+| nilike    | string         | 同上，不区分大小写                                             |
+| null      | 任意           | 是NULL，等同于{'eq': None}，null主要提供HTTP API中使用                   |
+| nnull     | 任意           | 不是NULL，等同于{'ne': None}，nnull主要提供HTTP API中使用                  |
+
+
 
 #### 业务api控制类
 
@@ -383,7 +389,7 @@ Host: 127.0.0.1:9002
 
 关于查询列表，我们提供了强大的查询能力，可以满足大部分的查询场景
 
-获取列表(查询)的接口可以使用Query参数过滤，使用过滤字段=xxx 或 字段__查询条件=xxx方式传递
+获取**列表(查询)的接口**可以使用Query参数过滤，使用过滤字段=xxx 或 字段__查询条件=xxx方式传递
 
 - **过滤条件**
 
@@ -404,25 +410,31 @@ Host: 127.0.0.1:9002
      name__in[0]=a&name__in[1]=b&name__in[2]=c
      ```
 
-     支持的查询过滤条件如下：
+     严格模式(CONF.strict_criteria_transform=True)仅支持全拼条件，CONF.strict_criteria_transform=False(默认)时同时支持全拼条件和缩写条件查询：
 
-| 过滤条件     | 含义                                                           |
-| ------------ | ------------------------------------------------------------   |
-| N/A          | 精确查询，完全等于条件，如果多个此条件出现，则认为条件在列表中 |
-| contains     | 模糊查询，包含条件                                             |
-| icontains    | 同上，不区分大小写                                             |
-| startswith   | 模糊查询，以xxxx开头                                           |
-| istartswith  | 同上，不区分大小写                                             |
-| endswith     | 模糊查询，以xxxx结尾                                           |
-| iendswith    | 同上，不区分大小写                                             |
-| in           | 精确查询，条件在列表中                                         |
-| notin        | 精确查询，条件不在列表中                                       |
-| equal        | 等于                                                           |
-| notequal     | 不等于                                                         |
-| less         | 小于                                                           |
-| lessequal    | 小于等于                                                       |
-| greater      | 大于                                                           |
-| greaterequal | 大于等于                                                       |
+
+| 全拼条件     | 缩写条件  | 含义                                                           |
+| ------------ | --------- | -------------------------------------------------------------- |
+| N/A          |           | 精确查询，完全等于条件，如果多个此条件出现，则认为条件在列表中 |
+| contains     | like      | 模糊查询，包含条件                                             |
+| icontains    | ilike     | 同上，不区分大小写                                             |
+| startswith   | starts    | 模糊查询，以xxxx开头                                           |
+| istartswith  | istarts   | 同上，不区分大小写                                             |
+| endswith     | ends      | 模糊查询，以xxxx结尾                                           |
+| iendswith    | iends     | 同上，不区分大小写                                             |
+| in           | in        | 精确查询，条件在列表中                                         |
+| notin        | nin       | 精确查询，条件不在列表中                                       |
+| equal        | eq        | 等于                                                           |
+| notequal     | ne        | 不等于                                                         |
+| less         | lt        | 小于                                                           |
+| lessequal    | lte       | 小于等于                                                       |
+| greater      | gt        | 大于                                                           |
+| greaterequal | gte       | 大于等于                                                       |
+| excludes     | nlike     | 模糊查询，不包含                                               |
+| iexcludes    | nilike    | 同上，不区分大小写                                             |
+| null         | null      | 是NULL                                                         |
+| notnull      | nnull     | 不是NULL                                                       |
+
 
 - **偏移量与数量限制**
 
@@ -446,9 +458,21 @@ Host: 127.0.0.1:9002
 
      多个字段排序以英文逗号间隔，默认递增，若字段前面有-减号则代表递减
 
-           PS：我可以使用+name代表递增吗？
-         
-           可以，但是HTTP URL中+号实际上的空格的编码，如果传递__orders=+name,-env_code，在HTTP中实际等价于__orders=空格name,-env_code, 无符号默认递增，因此无需多传递一个+号，传递字段即可
+     ```
+       PS：我可以使用+name代表递增吗？
+     
+       可以，但是HTTP URL中+号实际上的空格的编码，如果传递__orders=+name,-env_code，在HTTP中实际等价于__orders=空格name,-env_code, 无符号默认递增，因此无需多传递一个+号，传递字段即可
+     ```
+
+- **字段选择**
+
+     接口返回中，如果字段信息太多，会导致传输缓慢，并且需要客户端占用大量内存处理
+
+     ```bash
+     __fields=name,env_code
+     ```
+
+     可以指定返回需要的字段信息，或者干脆不指定，获取所有服务器支持的字段
 
 
 ### 进阶开发
@@ -566,6 +590,48 @@ with u.get_session() as session:
 #### 缓存
 
 ##### 配置和使用
+
+默认配置为进程内存，超时60秒
+
+```python
+'cache': {
+        'type': 'dogpile.cache.memory',
+        'expiration_time': 60
+}
+```
+
+缓存后端支持取决于dogpile模块，可以支持常见的memcache，redis等
+
+如：redis
+
+```python
+"cache": {
+        "type": "dogpile.cache.redis",
+        "expiration_time": 6,
+        "arguments": {
+            "host": "127.0.0.1",
+            "password": "football",
+            "port": 1234,
+            "db": 0,
+            "redis_expiration_time": 60,
+            "distributed_lock": true
+        }
+    }
+```
+
+使用方式
+
+```python
+from talos.common import cache
+
+cache.get(key, exipres=None)
+cache.set(key, value)
+cache.validate(value)
+cache.get_or_create(key, creator, expires=None)
+cache.delete(key)
+```
+
+
 
 #### 异步任务
 
@@ -1082,6 +1148,32 @@ $lang即配置项中的language
 
 
 
+## 工具库
+
+### 带宽限速
+
+talos.common.bandwidth_limiter:BandWidthLimiter
+
+### 导出CSV
+
+talos.common.exporter:export_csv
+
+### LDAP登录认证
+
+talos.common.ldap_util:Ldap
+
+### SMTP邮件发送
+
+talos.common.mailer:Mailer
+
+### 访问控制规则校验器
+
+talos.core.acl:Registry
+
+### 实用小函数
+
+talos.core.utils
+
 ## 配置项
 
 talos中预置了很多控制程序行为的配置项，可以允许用户进行相关的配置：全局配置、启动服务配置、日志配置、数据库连接配置、缓存配置、频率限制配置、异步和回调配置
@@ -1093,8 +1185,8 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | locale_app                             | string | 国际化locale应用名称                                         | 当前项目名                                                   |
 | locale_path                            | string | 国际化locale文件路径                                         | ./etc/locale                                                 |
 | global_list_size_limit_enabled         | bool   | 是否启用全局列表大小限制                                     | False                                                        |
-| global_list_size_limit                 | int    | 全局列表大小                                                 | None                                                         |
-| strict_criteria_transform              | bool   | 是否使用严格查询条件模式                                      | Flase                                                        |
+| global_list_size_limit                 | int    | 全局列表数据大小，如果没有设置，则默认返回全部，如果用户传入limit参数，则以用户参数为准 | None                                                         |
+| strict_criteria_transform              | bool   | 是否使用严格查询条件模式，如果True，则表示仅支持greater类查询，False则同时支持greater，gt类查询 | Flase                                                        |
 | override_defalut_middlewares           | bool   | 覆盖系统默认加载的中间件                                     | Flase                                                        |
 | server                                 | dict   | 服务监听配置项                                               |                                                              |
 | server.bind                            | string | 监听地址                                                     | 0.0.0.0                                                      |
@@ -1107,7 +1199,7 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | log.level                              | string | 日志级别                                                     | INFO                                                         |
 | log.format_string                      | string | 日志字段配置                                                 | %(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s |
 | log.date_format_string                 | string | 日志时间格式                                                 | %Y-%m-%d %H:%M:%S                                            |
-| log.loggers                            | list   | 模块独立日志配置，列表每个元素是dict                         |                                                              |
+| log.loggers                            | list   | 模块独立日志配置，列表每个元素是dict: [{"name": "cms.test.api", "path": "api.log"}] |                                                              |
 | log.loggers.name                       | string | 模块名称路径，如cms.apps.test                                |                                                              |
 | log.loggers.level                      | string | 日志级别                                                     |                                                              |
 | log.loggers.path                       | string | 日志路径                                                     |                                                              |
@@ -1146,3 +1238,4 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 [^1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
+[^ 4]: v1.2.0版本增加了__fields字段选择以及null, notnull, nlike, nilike的查询条件支持

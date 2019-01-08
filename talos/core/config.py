@@ -209,7 +209,7 @@ CONFIG_OPTS = {
     },
     'cache': {
         'type': 'dogpile.cache.memory',
-        'expiration_time': 3600
+        'expiration_time': 60
     },
     'application': {
         'names': []
