@@ -74,10 +74,12 @@ def column_from_expression(table, expression):
             field = fields.pop(0)
             # expression as column
             if isinstance(column, BinaryExpression):
+                field = int(field) if field.isdigit() else field
                 column = column[field]
             # column or relationship
             elif isinstance(column, attributes.InstrumentedAttribute):
                 if isinstance(column.property, properties.ColumnProperty):
+                    field = int(field) if field.isdigit() else field
                     column = column[field]
                 elif isinstance(column.property, relationships.RelationshipProperty):
                     # has or any
@@ -87,6 +89,7 @@ def column_from_expression(table, expression):
                     sub_fields = fields[:]
                     sub_fields.insert(0, field)
                     sub_expr_wrapper, column = column_from_expression(column.property.mapper.class_ , '.'.join(sub_fields))
+                    fields = []
                     if sub_expr_wrapper is not None:
                         # relationship depth too many, can not forged column
                         column = None
