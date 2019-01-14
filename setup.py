@@ -11,7 +11,6 @@ import sys
 
 from setuptools import setup, find_packages, Extension
 
-
 # To use a consistent encoding
 here = path.abspath(path.dirname(__file__))
 
@@ -37,7 +36,7 @@ setup(
     # https://packaging.python.org/en/latest/single_source_version.html
     version=version,
 
-    description='Falcon Base API Framework',
+    description='A Falcon Base, RESTful API Framework',
     long_description=long_description,
 
     # The project's main homepage.
@@ -78,7 +77,7 @@ setup(
     ],
 
     # What does your project relate to?
-    keywords='cmdb automation',
+    keywords='talos automation restful rest api celery sqlalchemy falcon',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().

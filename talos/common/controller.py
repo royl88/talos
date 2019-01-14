@@ -186,7 +186,7 @@ class CollectionController(Controller, SimplifyMixin):
         self._validate_method(req)
         criteria = self._build_criteria(req)
         refs = self.list(req, copy.deepcopy(criteria), **kwargs)
-        count = self.count(req, criteria, results=refs, **kwargs)
+        count = self.count(req, copy.deepcopy(criteria), results=refs, **kwargs)
         resp.json = {'count': count, 'data': refs}
 
     def count(self, req, criteria, results=None, **kwargs):
@@ -202,12 +202,11 @@ class CollectionController(Controller, SimplifyMixin):
         :returns: 符合条件的资源数量
         :rtype: int
         """
-        criteria = copy.deepcopy(criteria)
         # remove offset,limit
-        criteria.pop('offset')
-        criteria.pop('limit')
-        criteria.pop('orders')
-        criteria.pop('fields')
+        criteria.pop('offset', None)
+        criteria.pop('limit', None)
+        criteria.pop('orders', None)
+        criteria.pop('fields', None)
         return self.make_resource(req).count(**criteria)
 
     def list(self, req, criteria, **kwargs):
@@ -228,7 +227,7 @@ class CollectionController(Controller, SimplifyMixin):
                 criteria['limit'] = self.list_size_limit
             elif CONF.global_list_size_limit_enabled and CONF.global_list_size_limit is not None:
                 criteria['limit'] = CONF.global_list_size_limit
-        fields = criteria.pop('fields')
+        fields = criteria.pop('fields', None)
         refs = self.make_resource(req).list(**criteria)
         if fields is not None:
             refs = [self._simplify_info(ref, fields) for ref in refs]
