@@ -22,7 +22,6 @@ from talos.db import filter_wrapper
 from talos.db import pool
 from talos.db import validator
 
-
 if six.PY3:
     long = int
 CONF = config.CONF
@@ -320,35 +319,37 @@ class ResourceBase(object):
         return handlers.get(name, filter_wrapper.Filter())
 
     def _apply_filters(self, query, orm_meta, filters=None, orders=None):
+
         def _extract_column_visit_name(column):
             col_type = getattr(column, 'type', None)
             if col_type:
                 return getattr(col_type, '__visit_name__', None)
             return None
 
-        def _handle_filter(handler, op, query, column, value):
+        def _handle_filter(expr_wrapper, query, handler, op, column, value):
             if op:
                 func = getattr(handler, 'op_%s' % op, None)
-                if func:
-                    return func(query, column, value)
             else:
                 func = getattr(handler, 'op', None)
-                if func:
-                    return func(query, column, value)
+            if func:
+                if expr_wrapper:
+                    query = query.filter(expr_wrapper(func(column, value)))
+                else:
+                    query = query.filter(func(column, value))
             return query
 
         filters = filters or {}
         orders = orders or []
         for name, value in filters.items():
-            column = filter_wrapper.column_from_expression(orm_meta, name)
+            expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, name)
             if column is not None:
                 handler = self._get_filter_handler(_extract_column_visit_name(column))
                 if not isinstance(value, dict):
                     # op is None
-                    query = _handle_filter(handler, None, query, column, value)
+                    query = _handle_filter(expr_wrapper, query, handler, None, column, value)
                 else:
                     for operator, value in value.items():
-                        query = _handle_filter(handler, operator, query, column, value)
+                        query = _handle_filter(expr_wrapper, query, handler, operator, column, value)
         for field in orders:
             order = '+'
             if field.startswith('+'):
@@ -357,7 +358,7 @@ class ResourceBase(object):
             elif field.startswith('-'):
                 order = '-'
                 field = field[1:]
-            column = filter_wrapper.column_from_expression(orm_meta, field)
+            expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, field)
             if column:
                 if order == '+':
                     query = query.order_by(column)

@@ -215,7 +215,7 @@ class CollectionController(Controller, SimplifyMixin):
 
         :param req: 请求对象
         :type req: Request
-        :param criteria: {'filters': filters, 'offset': offset, 'limit': limit}
+        :param criteria: {'filters': dict, 'offset': None/int, 'limit': None/int, 'fields': []}
         :type criteria: dict
         :returns: 符合条件的资源
         :rtype: list
