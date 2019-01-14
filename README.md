@@ -437,7 +437,7 @@ Host: 127.0.0.1:9002
 
 
 
-字段支持：普通column字段、relationship字段(single or list)、JSON、JSONB
+字段支持：普通column字段、relationship字段(single or list)、JSON、JSONB[^ 4]
 
 假设有API对应如下表字段
 
@@ -462,9 +462,18 @@ class Address(Base, DictBase):
     items = Column(JSONB, nullable=False)
 
     user = relationship(u'User', lazy=True)
+    
+class Department(Base, DictBase):
+    __tablename__ = 'department'
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(36), nullable=False)
+    user_id = Column(ForeignKey(u'user.id'), nullable=False)
 ```
 
 可以这样构造过滤条件
+
+/v1/users?name=小明
 
 /v1/users?department.name=业务部
 
@@ -473,8 +482,6 @@ class Address(Base, DictBase):
 /v1/users?items.0.age=60 # items = [{"age": 60, "sex": "male"}, {...}]
 
 /v1/users?items.age=60 # items = {"age": 60, "sex": "male"}
-
-
 
 
 
@@ -1281,4 +1288,4 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 [^1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
-[^ 4]: v1.2.0版本增加了__fields字段选择以及null, notnull, nlike, nilike的查询条件支持
+[^ 4]: v1.2.0版本增加了__fields字段选择 以及 null, notnull, nlike, nilike的查询条件 以及 relationship查询支持
