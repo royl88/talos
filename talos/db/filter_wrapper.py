@@ -11,6 +11,9 @@ from __future__ import absolute_import
 
 import re
 
+from sqlalchemy.orm import attributes
+from sqlalchemy.orm import properties
+from sqlalchemy.orm import relationships
 from sqlalchemy.sql.expression import BinaryExpression
 from sqlalchemy.sql.sqltypes import _type_map
 
@@ -63,15 +66,37 @@ def merge(filters, filters_to_merge):
 
 
 def column_from_expression(table, expression):
+    expr_wrapper = None
     if '.' in expression:
         fields = expression.split('.')
         column = getattr(table, fields.pop(0), None)
-        if column:
-            for field in fields:
+        while column and fields:
+            field = fields.pop(0)
+            # column or relationship
+            if isinstance(column.property, properties.StrategizedProperty):
+                if isinstance(column.property, properties.ColumnProperty):
+                    column = column[field]
+                elif isinstance(column.property, relationships.RelationshipProperty):
+                    # has or any
+                    expr_wrapper = column.has
+                    if isinstance(column.impl, attributes.CollectionAttributeImpl):
+                        expr_wrapper = column.any
+                    sub_fields = fields[:]
+                    sub_fields.insert(0, field)
+                    sub_expr_wrapper, column = column_from_expression(column.property.mapper.class_ , '.'.join(sub_fields))
+                    if sub_expr_wrapper is not None:
+                        # relationship depth too many, can not forged column
+                        column = None
+                else:
+                    column = None
+            # expression as column
+            elif isinstance(column, BinaryExpression):
                 column = column[field]
+            else:
+                column = None
     else:
         column = getattr(table, expression, None)
-    return column
+    return expr_wrapper, column
 
 
 def cast(column, value):
@@ -93,135 +118,133 @@ def cast(column, value):
 
 class Filter(object):
 
-    def make_empty_query(self, query, column):
-        query = query.filter(column == None)
-        query = query.filter(column != None)
-        return query
+    def make_empty_query(self, column):
+        return column == None & column != None
 
-    def op(self, query, column, value):
+    def op(self, column, value):
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
-            query = query.filter(column.in_(tuple(value)))
+            expr = column.in_(tuple(value))
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
-            query = query.filter(column == value)
-        return query
+            expr = column == value
+        return expr
 
-    def op_in(self, query, column, value):
+    def op_in(self, column, value):
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
-            query = query.filter(column.in_(tuple(value)))
+            expr = column.in_(tuple(value))
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
-            query = query.filter(column == value)
-        return query
+            expr = column == value
+        return expr
 
-    def op_nin(self, query, column, value):
+    def op_nin(self, column, value):
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
-            query = query.filter(column.notin_(tuple(value)))
+            expr = column.notin_(tuple(value))
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
-            query = query.filter(column != value)
-        return query
+            expr = column != value
+        return expr
 
-    def op_eq(self, query, column, value):
+    def op_eq(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column == value)
-        return query
+        expr = column == value
+        return expr
 
-    def op_ne(self, query, column, value):
+    def op_ne(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column != value)
-        return query
+        expr = column != value
+        return expr
 
-    def op_lt(self, query, column, value):
+    def op_lt(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column < value)
-        return query
+        expr = column < value
+        return expr
 
-    def op_lte(self, query, column, value):
+    def op_lte(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column <= value)
-        return query
+        expr = column <= value
+        return expr
 
-    def op_gt(self, query, column, value):
+    def op_gt(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column > value)
-        return query
+        expr = column > value
+        return expr
 
-    def op_gte(self, query, column, value):
+    def op_gte(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column >= value)
-        return query
+        expr = column >= value
+        return expr
 
-    def op_like(self, query, column, value):
+    def op_like(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.like('%%%s%%' % value))
-        return query
+        expr = column.like('%%%s%%' % value)
+        return expr
 
-    def op_starts(self, query, column, value):
+    def op_starts(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.like('%s%%' % value))
-        return query
+        expr = column.like('%s%%' % value)
+        return expr
 
-    def op_ends(self, query, column, value):
+    def op_ends(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.like('%%%s' % value))
-        return query
+        expr = column.like('%%%s' % value)
+        return expr
     
-    def op_nlike(self, query, column, value):
+    def op_nlike(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.notlike('%%%s%%' % value))
-        return query
+        expr = column.notlike('%%%s%%' % value)
+        return expr
 
-    def op_ilike(self, query, column, value):
+    def op_ilike(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.ilike('%%%s%%' % value))
-        return query
+        expr = column.ilike('%%%s%%' % value)
+        return expr
 
-    def op_istarts(self, query, column, value):
+    def op_istarts(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.ilike('%s%%' % value))
-        return query
+        expr = column.ilike('%s%%' % value)
+        return expr
 
-    def op_iends(self, query, column, value):
+    def op_iends(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.ilike('%%%s' % value))
-        return query
+        expr = column.ilike('%%%s' % value)
+        return expr
     
-    def op_nilike(self, query, column, value):
+    def op_nilike(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.notilike('%%%s%%' % value))
-        return query
+        expr = column.notilike('%%%s%%' % value)
+        return expr
     
-    def op_nnull(self, query, column, value):
-        query = query.filter(column != None)
-        return query
+    def op_nnull(self, column, value):
+        expr = column != None
+        return expr
     
-    def op_null(self, query, column, value):
-        query = query.filter(column == None)
-        return query
+    def op_null(self, column, value):
+        expr = column == None
+        return expr
 
 
 class FilterNetwork(Filter):
@@ -285,116 +308,116 @@ class FilterNetwork(Filter):
         else:
             return self._fix_cidr(value)
 
-    def op(self, query, column, value):
+    def op(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             filters = column.op("<<=")(value[0])
             for index in range(1, len(value)):
                 filters |= column.op("<<=")(value[index])
-            query = query.filter(filters)
+            expr = filters
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
-            query = query.filter(column == value)
-        return query
+            expr = column == value
+        return expr
 
-    def op_in(self, query, column, value):
+    def op_in(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             filters = column.op("<<=")(value[0])
             for index in range(1, len(value)):
                 filters |= column.op("<<=")(value[index])
-            query = query.filter(filters)
+            expr = filters
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
-            query = query.filter(column.op("<<=")(value))
-        return query
+            expr = column.op("<<=")(value)
+        return expr
 
-    def op_nin(self, query, column, value):
+    def op_nin(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if utils.is_list_type(value):
             if isinstance(column, BinaryExpression):
                 column = cast(column, value[0])
             filters = ~column.op("<<=")(value[0])
             for index in range(1, len(value)):
                 filters &= ~column.op("<<=")(value[index])
-            query = query.filter(filters)
+            expr = filters
         else:
             if isinstance(column, BinaryExpression):
                 column = cast(column, value)
-            query = query.filter(~column.op("<<=")(value))
-        return query
+            expr = ~column.op("<<=")(value)
+        return expr
 
-    def op_like(self, query, column, value):
-        return query
+    def op_like(self, column, value):
+        return None
     
-    def op_nlike(self, query, column, value):
-        return query
+    def op_nlike(self, column, value):
+        return None
 
-    def op_starts(self, query, column, value):
-        return query
+    def op_starts(self, column, value):
+        return None
 
-    def op_ends(self, query, column, value):
-        return query
+    def op_ends(self, column, value):
+        return None
 
-    def op_ilike(self, query, column, value):
-        return query
+    def op_ilike(self, column, value):
+        return None
     
-    def op_nilike(self, query, column, value):
-        return query
+    def op_nilike(self, column, value):
+        return None
 
-    def op_istarts(self, query, column, value):
-        return query
+    def op_istarts(self, column, value):
+        return None
 
-    def op_iends(self, query, column, value):
-        return query
+    def op_iends(self, column, value):
+        return None
 
-    def op_lt(self, query, column, value):
+    def op_lt(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.op("<<")(value))
-        return query
+        expr = column.op("<<")(value)
+        return expr
 
-    def op_lte(self, query, column, value):
+    def op_lte(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.op("<<=")(value))
-        return query
+        expr = column.op("<<=")(value)
+        return expr
 
-    def op_gt(self, query, column, value):
+    def op_gt(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.op(">>")(value))
-        return query
+        expr = column.op(">>")(value)
+        return expr
 
-    def op_gte(self, query, column, value):
+    def op_gte(self, column, value):
         value = self.validate_cidr(value)
         if not value:
-            return self.make_empty_query(query, column)
+            return self.make_empty_query(column)
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
-        query = query.filter(column.op(">>=")(value))
-        return query
+        expr = column.op(">>=")(value)
+        return expr
 
 
 class FilterNumber(Filter):
@@ -402,29 +425,29 @@ class FilterNumber(Filter):
     数字类型不支持like操作
     '''
 
-    def op_like(self, query, column, value):
-        return query
+    def op_like(self, column, value):
+        return None
     
-    def op_nlike(self, query, column, value):
-        return query
+    def op_nlike(self, column, value):
+        return None
 
-    def op_starts(self, query, column, value):
-        return query
+    def op_starts(self, column, value):
+        return None
 
-    def op_ends(self, query, column, value):
-        return query
+    def op_ends(self, column, value):
+        return None
 
-    def op_ilike(self, query, column, value):
-        return query
+    def op_ilike(self, column, value):
+        return None
     
-    def op_nilike(self, query, column, value):
-        return query
+    def op_nilike(self, column, value):
+        return None
 
-    def op_istarts(self, query, column, value):
-        return query
+    def op_istarts(self, column, value):
+        return None
 
-    def op_iends(self, query, column, value):
-        return query
+    def op_iends(self, column, value):
+        return None
 
 
 FilterDateTime = FilterNumber
