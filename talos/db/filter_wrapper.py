@@ -70,10 +70,13 @@ def column_from_expression(table, expression):
     if '.' in expression:
         fields = expression.split('.')
         column = getattr(table, fields.pop(0), None)
-        while column and fields:
+        while column is not None and fields:
             field = fields.pop(0)
+            # expression as column
+            if isinstance(column, BinaryExpression):
+                column = column[field]
             # column or relationship
-            if isinstance(column.property, properties.StrategizedProperty):
+            elif isinstance(column, attributes.InstrumentedAttribute):
                 if isinstance(column.property, properties.ColumnProperty):
                     column = column[field]
                 elif isinstance(column.property, relationships.RelationshipProperty):
@@ -89,9 +92,7 @@ def column_from_expression(table, expression):
                         column = None
                 else:
                     column = None
-            # expression as column
-            elif isinstance(column, BinaryExpression):
-                column = column[field]
+            
             else:
                 column = None
     else:

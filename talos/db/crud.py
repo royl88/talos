@@ -331,11 +331,17 @@ class ResourceBase(object):
                 func = getattr(handler, 'op_%s' % op, None)
             else:
                 func = getattr(handler, 'op', None)
+            expr = None
             if func:
-                if expr_wrapper:
-                    query = query.filter(expr_wrapper(func(column, value)))
-                else:
-                    query = query.filter(func(column, value))
+                expr = func(column, value)
+                if expr is not None:
+                    if expr_wrapper:
+                        query = query.filter(expr_wrapper(expr))
+                    else:
+                        query = query.filter(expr)
+            if expr is None:
+                # FIXME(wujj): unsupported filter
+                pass
             return query
 
         filters = filters or {}
@@ -359,7 +365,8 @@ class ResourceBase(object):
                 order = '-'
                 field = field[1:]
             expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, field)
-            if column:
+            # 不支持relationship排序
+            if column and expr_wrapper is None:
                 if order == '+':
                     query = query.order_by(column)
                 else:
