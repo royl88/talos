@@ -437,7 +437,7 @@ Host: 127.0.0.1:9002
 
 
 
-字段支持：普通column字段、relationship字段(single or list)、JSON、JSONB[^ 4]
+字段支持：普通column字段、relationship字段(single or list)、JSONB[^ 4]
 
 假设有API对应如下表字段
 
@@ -478,6 +478,8 @@ class Department(Base, DictBase):
 /v1/users?department.name=业务部
 
 /v1/users?addresses.location__icontains=广东省
+
+/v1/users?addresses.items.key__icontains=temp
 
 /v1/users?items.0.age=60 # items = [{"age": 60, "sex": "male"}, {...}]
 
