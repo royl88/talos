@@ -436,6 +436,49 @@ Host: 127.0.0.1:9002
 | notnull      | nnull     | 不是NULL                                                       |
 
 
+
+字段支持：普通column字段、relationship字段(single or list)、JSON、JSONB
+
+假设有API对应如下表字段
+
+```python
+class User(Base, DictBase):
+    __tablename__ = 'user'
+
+    id = Column(String(36), primary_key=True)
+    name = Column(String(36), nullable=False)
+    department_id = Column(ForeignKey(u'department.id'), nullable=False)
+    items = Column(JSONB, nullable=False)
+
+    department = relationship(u'Department', lazy=False)
+    addresses = relationship(u'Address', lazy=False, back_populates=u'user', uselist=True, viewonly=True)
+    
+class Address(Base, DictBase):
+    __tablename__ = 'address'
+
+    id = Column(String(36), primary_key=True)
+    location = Column(String(36), nullable=False)
+    user_id = Column(ForeignKey(u'user.id'), nullable=False)
+    items = Column(JSONB, nullable=False)
+
+    user = relationship(u'User', lazy=True)
+```
+
+可以这样构造过滤条件
+
+/v1/users?department.name=业务部
+
+/v1/users?addresses.location__icontains=广东省
+
+/v1/users?items.0.age=60 # items = [{"age": 60, "sex": "male"}, {...}]
+
+/v1/users?items.age=60 # items = {"age": 60, "sex": "male"}
+
+
+
+
+
+
 - **偏移量与数量限制**
 
      查询返回列表时，通常需要指定偏移量以及数量限制
