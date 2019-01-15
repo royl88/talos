@@ -327,6 +327,7 @@ class ResourceBase(object):
             return None
 
         def _handle_filter(expr_wrapper, query, handler, op, column, value):
+            supported = True
             if op:
                 func = getattr(handler, 'op_%s' % op, None)
             else:
@@ -340,22 +341,27 @@ class ResourceBase(object):
                     else:
                         query = query.filter(expr)
             if expr is None:
-                # FIXME(wujj): unsupported filter
-                pass
-            return query
+                supported = False
+            return supported, query
 
         filters = filters or {}
         orders = orders or []
         for name, value in filters.items():
             expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, name)
+            supported = True
             if column is not None:
                 handler = self._get_filter_handler(_extract_column_visit_name(column))
                 if not isinstance(value, dict):
                     # op is None
-                    query = _handle_filter(expr_wrapper, query, handler, None, column, value)
+                    _supported, query = _handle_filter(expr_wrapper, query, handler, None, column, value)
+                    supported = supported and _supported
                 else:
                     for operator, value in value.items():
-                        query = _handle_filter(expr_wrapper, query, handler, operator, column, value)
+                        _supported, query = _handle_filter(expr_wrapper, query, handler, operator, column, value)
+                        supported = supported and _supported
+            if column is None or not supported:
+                # FIXME: (wujj)ignore or make empty query
+                query = self._unsupported_filter(query, name, value)
         for field in orders:
             order = '+'
             if field.startswith('+'):
@@ -371,6 +377,19 @@ class ResourceBase(object):
                     query = query.order_by(column)
                 else:
                     query = query.order_by(column.desc())
+        return query
+    
+    def _unsupported_filter(self, query, name, value):
+        '''
+        未默认受支持的过滤条件，因talos以前行为为忽略，因此默认返回query不做任何处理，
+        此处可以修改并返回query对象更改默认行为
+        :param query: SQL查询对象
+        :type query: sqlalchemy.query
+        :param name: 过滤字段
+        :type name: str
+        :param value: 过滤值对象
+        :type value: str/list/dict
+        '''
         return query
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):

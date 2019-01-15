@@ -485,6 +485,8 @@ class Department(Base, DictBase):
 
 /v1/users?items.age=60 # items = {"age": 60, "sex": "male"}
 
+> v1.2.0起未支持的column或condition会触发ResourceBase._unsupported_filter(query, name, value)函数，函数默认返回参数query以忽略未支持的过滤(兼容以前版本行为)，用户可以自行重载函数以实现自定义行为
+
 
 
 
