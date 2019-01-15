@@ -151,8 +151,8 @@ class ColumnValidator(object):
         if self.rule is None and self.rule_type is None:
             return True
         if value is None and not self.nullable:
-            result = _('not nullable')
-        elif self.rule_type == 'callback':
+            return _('not nullable')
+        if self.rule_type == 'callback':
             # 如果是用户指定callback，直接调用
             result = self.rule(value)
             if result is True:
