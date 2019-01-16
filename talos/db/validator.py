@@ -24,52 +24,59 @@ class RegexValidator(NullValidator):
     """正则验证器"""
 
     def __init__(self, templ, ignore_case=False):
-        self.templ = templ
-        self.flags = re.IGNORECASE if ignore_case else 0
+        self._templ = templ
+        self._flags = re.IGNORECASE if ignore_case else 0
 
     def validate(self, value):
         if not utils.is_string_type(value):
-            return _('regex validator need string input, not %(type)s') % {'type': type(value).__name__}
-        if re.match(self.templ, value, self.flags) is not None:
+            return _('need string input, not %(type)s') % {'type': type(value).__name__}
+        if re.match(self._templ, value, self._flags) is not None:
             return True
-        return _('regex match error,regex: %(rule)s, value: %(value)s') % {'rule': self.templ, 'value': value}
+        return _('regex match error,regex: %(rule)s, value: %(value)s') % {'rule': self._templ, 'value': value}
 
 
 class EmailValidator(NullValidator):
     """email验证器"""
 
     def __init__(self):
-        self.templ = r'\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*'
-        self.msg = _('malformated email address: %(value)s')
+        self._templ = r'\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*'
+        self._msg = _('malformated email address: %(value)s')
 
     def validate(self, value):
-        if re.match(self.templ, value) is not None:
+        if not utils.is_string_type(value):
+            return _('need string input, not %(type)s') % {'type': type(value).__name__}
+        if re.match(self._templ, value) is not None:
             return True
-        return self.msg % {'value': value}
+        return self._msg % {'value': value}
 
 
 class PhoneValidator(EmailValidator):
     """电话号码验证器"""
 
     def __init__(self):
-        self.templ = r'\d{3}-\d{8}|\d{4}-\d{7}|\d{11}'
-        self.msg = _('malformated phone number: %(value)s')
+        self._templ = r'\d{3}-\d{8}|\d{4}-\d{7}|\d{11}'
+        self._msg = _('malformated phone number: %(value)s')
 
 
 class UrlValidator(EmailValidator):
     """url验证器"""
 
     def __init__(self):
-        self.templ = r'[a-zA-z]+://[^\s]+'
-        self.msg = _('malformated url address: %(value)s')
+        self._templ = r'[a-zA-z]+://[^\s]+'
+        self._msg = _('malformated url address: %(value)s')
 
 
 class Ipv4CidrValidator(NullValidator):
     """cidr验证器"""
 
+    def __init__(self, strict=True):
+        self._strict = strict
+
     def validate(self, value):
+        if not utils.is_string_type(value):
+            return _('need string input, not %(type)s') % {'type': type(value).__name__}
         try:
-            ipaddress.IPv4Network(utils.ensure_unicode(value))
+            ipaddress.IPv4Network(utils.ensure_unicode(value), strict=self._strict)
             return True
         except ipaddress.AddressValueError as e:
             return str(e)
@@ -79,6 +86,8 @@ class Ipv4Validator(NullValidator):
     """ipv4验证器"""
 
     def validate(self, value):
+        if not utils.is_string_type(value):
+            return _('need string input, not %(type)s') % {'type': type(value).__name__}
         try:
             ipaddress.IPv4Address(utils.ensure_unicode(value))
             return True
@@ -90,66 +99,84 @@ class LengthValidator(NullValidator):
     """长度验证器"""
 
     def __init__(self, minimum, maximum):
-        self.minimum = minimum
-        self.maximum = maximum
+        self._minimum = minimum
+        self._maximum = maximum
 
     def validate(self, value):
         if not (utils.is_string_type(value) or utils.is_list_type(value)):
             return _('expected string or list to calculate length, not %(type)s ') % {'type': type(value).__name__}
-        if self.minimum <= len(value) and len(value) <= self.maximum:
+        if self._minimum <= len(value) and len(value) <= self._maximum:
             return True
-        return _('length required: %(min)d <= %(value)d <= %(max)d') % {'min': self.minimum, 'value': len(value), 'max': self.maximum}
+        return _('length required: %(min)d <= %(value)d <= %(max)d') % {'min': self._minimum, 'value': len(value), 'max': self._maximum}
 
 
 class TypeValidator(NullValidator):
     """类型验证器"""
 
     def __init__(self, *types):
-        self.types = types
+        self._types = types
 
     def validate(self, value):
-        if isinstance(value, self.types):
+        if isinstance(value, self._types):
             return True
-        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self.types])}
+        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self._types])}
 
 
 class NumberValidator(NullValidator):
     """数字型验证器"""
 
     def __init__(self, *types, **kwargs):
-        self.types = tuple(types)
-        self.range_min = kwargs.pop('range_min', None)
-        self.range_max = kwargs.pop('range_max', None)
+        self._types = tuple(types)
+        self._range_min = kwargs.pop('range_min', None)
+        self._range_max = kwargs.pop('range_max', None)
 
     def validate(self, value):
-        if isinstance(value, self.types):
-            if self.range_min is not None and self.range_min > value:
-                return _('number range min required > %(min)d') % {'min': self.range_min}
-            if self.range_max is not None and self.range_max < value:
-                return _('number range max required < %(max)d') % {'max': self.range_max}
+        if not utils.is_number_type(value):
+            return _('need number input, not %(type)s') % {'type': type(value).__name__}
+        if isinstance(value, self._types):
+            if self._range_min is not None and self._range_min >= value:
+                return _('number range min required >= %(min)d') % {'min': self._range_min}
+            if self._range_max is not None and self._range_max <= value:
+                return _('number range max required <= %(max)d') % {'max': self._range_max}
             return True
-        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self.types])}
+        return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self._types])}
 
 
 class InValidator(NullValidator):
     """列表内容(在)范围型验证器"""
 
-    def __init__(self, ranger):
-        self.ranger = set(ranger)
+    def __init__(self, choices):
+        self._choices = set(choices)
 
     def validate(self, value):
-        if value in self.ranger:
+        if value in self._choices:
             return True
-        return _('invalid choice: %(value)s, expected: %(choice)s') % {'value': value, 'choice': str(self.ranger)}
+        return _('invalid choice: %(value)s, expected: %(choice)s') % {'value': value, 'choice': str(self._choices)}
 
 
 class NotInValidator(NullValidator):
     """列表内容(不在)范围型验证器"""
 
-    def __init__(self, ranger):
-        self.ranger = set(ranger)
+    def __init__(self, choices):
+        self._choices = set(choices)
 
     def validate(self, value):
-        if value not in self.ranger:
+        if value not in self._choices:
             return True
-        return _('invalid choice: %(value)s, not expected: %(choice)s') % {'value': value, 'choice': str(self.ranger)}
+        return _('invalid choice: %(value)s, not expected: %(choice)s') % {'value': value, 'choice': str(self._choices)}
+
+
+class ChainValidator(NullValidator):
+    """验证器串联型验证器"""
+
+    def __init__(self, *nodes):
+        # 每个node都有类似validator的行为（含validate函数，返回True或错误信息）
+        self._nodes = list(nodes)
+
+    def validate(self, value):
+        for n in self._nodes:
+            result = n.validate(value)
+            if result is not True:
+                return result
+        return True
+    
