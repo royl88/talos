@@ -12,6 +12,7 @@ import fnmatch
 import hashlib
 import inspect
 import json
+import numbers
 import os
 import random
 import socket
@@ -168,6 +169,18 @@ def unixtime(dt_obj):
     return calendar.timegm(dt_obj.utctimetuple())
 
 
+def dttime(ts):
+    """
+    将DataTime对象转换为unix时间
+
+    :param ts: unix时间
+    :type ts: float
+    :returns: datetime.datetime 对象
+    :rtype: datetime.datetime
+    """
+    return datetime.datetime.fromtimestamp(ts)
+
+
 def bool_from_string(subject, strict=False, default=False):
     """
     将字符串转换为bool值
@@ -228,6 +241,18 @@ def is_list_type(value):
     :rtype: bool
     """
     return isinstance(value, (list, set, tuple))
+
+
+def is_number_type(value):
+    """
+    判断value是否数字类型，int/long/float/complex
+
+    :param value: 输入值
+    :type value: any
+    :returns: 判断结果
+    :rtype: bool
+    """
+    return isinstance(value, numbers.Number)
 
 
 def format_kwstring(templ, **kwargs):
