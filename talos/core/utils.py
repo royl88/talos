@@ -7,6 +7,7 @@
 from __future__ import absolute_import
 
 import calendar
+import collections
 import datetime
 import fnmatch
 import hashlib
@@ -15,6 +16,7 @@ import json
 import numbers
 import os
 import random
+import re
 import socket
 import uuid
 
@@ -309,15 +311,18 @@ def ensure_bytes(value):
     raise ValueError('can not convert to bytes')
 
 
-def get_config(conf, expr, default=None):
+def get_config(data, expr, default=None):
     '''
-    配置获取辅助函数
-    :param conf: CONF对象
-    :param expr: 路径表达式，eg. log.path
-    :param default: 如果不存在，则使用默认default值
+    使用a.[b].c表达式从对象中获取值
+    :param data:     对象,支持getattr的任意对象
+    :type data:      any
+    :param expr:     路径表达式，eg. log.path
+    :type expr:      str
+    :param default:  如果表达式的值不存在，则返回默认值
+    :type default:   any
     '''
     names = expr.split('.')
-    result = conf
+    result = data
     for name in names:
         try:
             result = getattr(result, name)
@@ -325,3 +330,76 @@ def get_config(conf, expr, default=None):
             result = default
             break
     return result
+
+
+get_attr = get_config
+
+
+def get_item(data, expr, delimiter='.', default=None):
+    '''
+    使用a.[b].c表达式从dict中获取值
+    
+    :param data:      数据
+    :type data:       dict/list/tuple/set
+    :param expr:      路径表达式，eg. log.path
+    :type expr:       str
+    :param delimiter: 分割符号，默认是.
+    :type delimiter:  str
+    :param default:   如果表达式的值不存在，则返回默认值
+    :type default:    any
+    '''
+
+    class _NotExist(object):
+        pass
+
+    def _from_list(data, key, default=None):
+        pattern_int = r'\[\s*(\d+)\s*\]'
+        pattern_string = r'\[\s*([-_a-zA-Z0-9]+)\s*\]'
+        matches = re.search(pattern_int, key)
+        index = None
+        value = default
+        # 如果在key中找到索引访问
+        if matches:
+            index = int(matches.groups()[0])
+            # 确认索引值在区间[0, len(data))，取值并赋值到value
+            if len(data) > index:
+                value = data[index]
+        # 没有找到索引访问，尝试内部字典方式
+        # [{'a': 1}, {'a': 2}] -> [1, 2]
+        else:
+            matches = re.search(pattern_string, key)
+            if matches:
+                inner_key = matches.groups()[0]
+                inner_values = []
+                for item in data:
+                    inner_value = item.get(inner_key, VALUE_NOT_EXIST)
+                    if inner_value != VALUE_NOT_EXIST:
+                        inner_values.append(inner_value)
+                if len(inner_values) > 0:
+                    value = inner_values
+        return value
+
+    VALUE_NOT_EXIST = _NotExist()
+    keys = expr.split(delimiter)
+    value = data
+    for k in keys:
+        # 如果key无效，直接返回default
+        if len(k) == 0:
+            value = VALUE_NOT_EXIST
+            break
+        # 如果key无效，直接返回default
+        if value == VALUE_NOT_EXIST:
+            break
+
+        # 当前value是list/tuple/str/unicode/bytes
+        if isinstance(value, collections.Sequence):
+            value = _from_list(value, k, default=VALUE_NOT_EXIST)
+        # 当前value是dict/orderdict/counter，获取字典对应k的值，并赋值到value
+        elif isinstance(value, collections.Mapping):
+            value = value.get(k, VALUE_NOT_EXIST)
+        # 否则直接返回default
+        else:
+            value = VALUE_NOT_EXIST
+    if value == VALUE_NOT_EXIST:
+        value = default
+    return value
