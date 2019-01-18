@@ -9,68 +9,10 @@ from __future__ import absolute_import
 import codecs
 import csv
 import os
-import re
 import shutil
 import tempfile
 
-
-class _NotExist(object):
-    pass
-
-
-VALUE_NOT_EXIST = _NotExist()
-
-
-def _recursive_get(data, key, delimiter='.', default=None):
-    def _recursive_get_list(data, key, delimiter=';', default=None):
-        pattern_int = r'\[\s*(\d+)\s*\]'
-        pattern_string = r'\[\s*([-_a-zA-Z0-9]+)\s*\]'
-        matches = re.search(pattern_int, key)
-        index = None
-        value = default
-        # 如果在key中找到索引访问
-        if matches:
-            index = int(matches.groups()[0])
-            # 确认索引值在区间[0, len(data))，取值并赋值到value
-            if len(data) > index:
-                value = data[index]
-        # 没有找到索引访问，尝试内部字典方式
-        else:
-            matches = re.search(pattern_string, key)
-            if matches:
-                inner_key = matches.groups()[0]
-                inner_values = []
-                for item in data:
-                    inner_value = item.get(inner_key, VALUE_NOT_EXIST)
-                    if inner_value != VALUE_NOT_EXIST and inner_value is not None:
-                        inner_values.append(inner_value)
-                if len(inner_values) > 0:
-                    value = delimiter.join(inner_values)
-        return value
-
-    keys = key.split(delimiter)
-    value = data
-    for k in keys:
-        # 如果key无效，直接返回default
-        if len(k) == 0:
-            value = VALUE_NOT_EXIST
-            break
-        else:
-            # 当前value是list
-            if isinstance(value, (list, tuple, set)):
-                value = _recursive_get_list(value, k, default=VALUE_NOT_EXIST)
-            # 当前value是dict，获取字典对应k的值，并赋值到value
-            elif isinstance(value, dict):
-                value = value.get(k, VALUE_NOT_EXIST)
-                # 没有对应的key，直接返回default
-                if value == VALUE_NOT_EXIST:
-                    break
-            # 否则直接返回default
-            else:
-                value = VALUE_NOT_EXIST
-    if value == VALUE_NOT_EXIST:
-        value = default
-    return value
+from talos.core import utils
 
 
 def export_csv(filename, rows, mapping):
@@ -109,11 +51,14 @@ def export_csv(filename, rows, mapping):
                 if isinstance(x['index'], int) and isinstance(row, (list, tuple, set)):
                     value = row[x['index']]
                 else:
-                    value = _recursive_get(
+                    value = utils.get_item(
                         row, x['index'], default=x.get('default', ''))
                 if 'renderer' in x:
                     render = x['renderer']
                     value = render(value)
+                elif 'xrenderer' in x:
+                    render = x['xrenderer']
+                    value = render(row, value)
                 gbk_row.append(value)
             csvwriter.writerow(gbk_row)
         return True
