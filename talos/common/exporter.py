@@ -14,6 +14,8 @@ import tempfile
 
 from talos.core import utils
 
+_recursive_get = utils.get_item
+
 
 def export_csv(filename, rows, mapping):
     """
@@ -51,7 +53,7 @@ def export_csv(filename, rows, mapping):
                 if isinstance(x['index'], int) and isinstance(row, (list, tuple, set)):
                     value = row[x['index']]
                 else:
-                    value = utils.get_item(
+                    value = _recursive_get(
                         row, x['index'], default=x.get('default', ''))
                 if 'renderer' in x:
                     render = x['renderer']
