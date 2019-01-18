@@ -44,22 +44,48 @@ class ColumnValidator(object):
     aliases = None
     nullable = False
 
-    def __init__(self, **kwargs):
-        """
-        初始化
-        """
-        self.field = kwargs.pop('field')
-        self.rule = kwargs.pop('rule', None)
-        self.rule_type = kwargs.pop('rule_type', None)
-        self.validate_on = kwargs.pop('validate_on', None)
-        self.error_msg = kwargs.pop('error_msg', '%(result)s')
-        self.converter = kwargs.pop('converter', None)
-        self.orm_required = kwargs.pop('orm_required', True)
-        self.aliases = kwargs.pop('aliases', [])
-        self.nullable = kwargs.pop('nullable', False)
+    def __init__(self,
+                 field,
+                 rule=None,
+                 rule_type=None,
+                 validate_on=None,
+                 error_msg='%(result)s',
+                 converter=None,
+                 orm_required=True,
+                 aliases=None,
+                 nullable=False):
+        '''
+        :param field: 字段名称
+        :type field: str
+        :param rule: 校验规则，或者校验规则的参数
+        :type rule: Validator object/arguments of Validator
+        :param rule_type: 校验规则的类型，如果rule是Validator对象，则rule_type不生效
+        :type rule_type: str
+        :param validate_on: 验证场景以及可选必选性, ['create:M', 'update:O'], create为函数名，M是必选，O是可选
+        :type validate_on: list
+        :param error_msg: 错误信息模板，可以接受result格式化参数，result为实际校验器返回错误信息
+        :type error_msg: str
+        :param converter: 转换器
+        :type converter: Convertor object
+        :param orm_required: 是否数据库字段，可以控制是否传递到实际数据库sql语句中
+        :type orm_required: bool
+        :param aliases: 别名列表，别名的key也被当做field进行处理
+        :type aliases: list
+        :param nullable: 是否可以为None
+        :type nullable: bool
+        '''
+
+        self.field = field
+        self.rule = rule
+        self.rule_type = rule_type
         # 用户不指定，默认全部场景
-        if self.validate_on is None:
-            self.validate_on = [VALIDATE_ON_ALL]
+        self.validate_on = validate_on or [VALIDATE_ON_ALL]
+        self.error_msg = error_msg
+        self.converter = converter
+        self.orm_required = orm_required
+        self.aliases = aliases
+        self.nullable = nullable
+
         self.validate_on = self._build_situation(self.validate_on)
         if self.rule is None and self.rule_type is None:
             pass
