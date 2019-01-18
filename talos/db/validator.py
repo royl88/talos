@@ -20,6 +20,18 @@ class NullValidator(object):
         return True
 
 
+class CallbackValidator(NullValidator):
+    """回调验证器"""
+
+    def __init__(self, func):
+        self._func = func
+        if not callable(func):
+            raise ValueError(_('must be callable, eg. func(value)'))
+
+    def validate(self, value):
+        return self._func(value)
+
+
 class RegexValidator(NullValidator):
     """正则验证器"""
 
@@ -134,10 +146,10 @@ class NumberValidator(NullValidator):
         if not utils.is_number_type(value):
             return _('need number input, not %(type)s') % {'type': type(value).__name__}
         if isinstance(value, self._types):
-            if self._range_min is not None and self._range_min >= value:
-                return _('number range min required >= %(min)d') % {'min': self._range_min}
-            if self._range_max is not None and self._range_max <= value:
-                return _('number range max required <= %(max)d') % {'max': self._range_max}
+            if self._range_min is not None and self._range_min > value:
+                return _('number range min required, %(min)d <= value') % {'min': self._range_min}
+            if self._range_max is not None and self._range_max < value:
+                return _('number range max required, value <= %(max)d') % {'max': self._range_max}
             return True
         return _('type invalid: %(type)s, expected: %(expected)s') % {'type': type(value), 'expected': ' or '.join([str(t) for t in self._types])}
 
@@ -169,9 +181,9 @@ class NotInValidator(NullValidator):
 class ChainValidator(NullValidator):
     """验证器串联型验证器"""
 
-    def __init__(self, *nodes):
+    def __init__(self, nodes):
         # 每个node都有类似validator的行为（含validate函数，返回True或错误信息）
-        self._nodes = list(nodes)
+        self._nodes = nodes
 
     def validate(self, value):
         for n in self._nodes:
