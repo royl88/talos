@@ -65,8 +65,7 @@ class ColumnValidator(object):
             pass
         elif not isinstance(self.rule, validator.NullValidator):
             if self.rule_type == 'callback':
-                if not callable(self.rule):
-                    raise exceptions.CriticalError(msg=_('rule callback function malformat,eg: fucntion(value)'))
+                self.rule = validator.CallbackValidator(self.rule)
             elif self.rule_type == 'regex':
                 if utils.is_string_type(self.rule):
                     self.rule = validator.RegexValidator(self.rule)
@@ -152,16 +151,11 @@ class ColumnValidator(object):
             return True
         if value is None and not self.nullable:
             return _('not nullable')
-        if self.rule_type == 'callback':
-            # 如果是用户指定callback，直接调用
-            result = self.rule(value)
-            if result is True:
-                return True
-        else:
-            # 否则使用通用validator
-            result = self.rule.validate(value)
-            if result is True:
-                return True
+
+        # 使用通用validate
+        result = self.rule.validate(value)
+        if result is True:
+            return True
         return self.error_msg % ({'result': result})
 
     def convert(self, value):
