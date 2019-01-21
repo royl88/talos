@@ -6,12 +6,13 @@
 
 from __future__ import absolute_import
 
+import collections
 import contextlib
 import copy
 import logging
 
 import six
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 import sqlalchemy.exc
 
 from talos.core import config
@@ -333,6 +334,13 @@ class ResourceBase(object):
             'datetime': filter_wrapper.FilterDateTime(),
         }
         return handlers
+    
+    def _filter_key_mapping(self):
+        keys = {
+            '$or': or_,
+            '$and': and_,
+        }
+        return keys
 
     def _get_filter_handler(self, name):
         handlers = self._filter_hander_mapping()
@@ -341,47 +349,130 @@ class ResourceBase(object):
     def _apply_filters(self, query, orm_meta, filters=None, orders=None):
 
         def _extract_column_visit_name(column):
+            '''
+            获取列名称
+            :param column: 列对象
+            :type column: `ColumnAttribute`
+            '''
             col_type = getattr(column, 'type', None)
             if col_type:
                 return getattr(col_type, '__visit_name__', None)
             return None
-
-        def _handle_filter(expr_wrapper, query, handler, op, column, value):
-            supported = True
+        
+        def _handle_filter(expr_wrapper, handler, op, column, value):
+            '''
+            将具体列+操作+值转化为SQL表达式（SQLAlchmey表达式）
+            :param expr_wrapper: 表达式的外包装器，比如一对一的外键列expr_wrapper为relationship.column.has
+            :type expr_wrapper: callable
+            :param handler: filter wrapper对应的Filter对象
+            :type handler: `talos.db.filter_wrapper.Filter`
+            :param op: 过滤条件，如None, eq, ne, gt, gte, lt, lte 等
+            :type op: str
+            :param column: 列对象
+            :type column: `ColumnAttribute`
+            :param value: 过滤值
+            :type value: any
+            '''
+            expr = None
+            func = None
             if op:
                 func = getattr(handler, 'op_%s' % op, None)
             else:
                 func = getattr(handler, 'op', None)
-            expr = None
             if func:
                 expr = func(column, value)
                 if expr is not None:
                     if expr_wrapper:
-                        query = query.filter(expr_wrapper(expr))
-                    else:
-                        query = query.filter(expr)
-            if expr is None:
-                supported = False
-            return supported, query
-
-        filters = filters or {}
-        orders = orders or []
-        for name, value in filters.items():
+                        expr = expr_wrapper(expr)
+            return expr
+        
+        def _get_expression(filters):
+            '''
+            将所有filters转换为表达式
+            :param filters: 过滤条件字典
+            :type filters: dict
+            '''
+            expressions = []
+            unsupported = []
+            for name, value in filters.items():
+                if name in reserved_keys:
+                    _unsupported, expr = _get_key_expression(name, value)
+                else:
+                    _unsupported, expr = _get_column_expression(name, value)
+                unsupported.extend(_unsupported)
+                if expr is not None:
+                    expressions.append(expr)
+            return unsupported, expressions
+        
+        def _get_key_expression(name, value):
+            '''
+            将$and, $or类的组合过滤转换为表达式
+            :param name:
+            :type name:
+            :param value:
+            :type value:
+            '''
+            key_wrapper = reserved_keys[name]
+            unsupported = []
+            expressions = []
+            for key_filters in value:
+                _unsupported, expr = _get_expression(key_filters)
+                unsupported.extend(_unsupported)
+                if expr is not None:
+                    expr = and_(*expr)
+                    expressions.append(expr)
+            if len(expressions) == 0:
+                return unsupported, None
+            if len(expressions) == 1:
+                return unsupported, expressions[0]
+            else:
+                return unsupported, key_wrapper(*expressions)
+        
+        def _get_column_expression(name, value):
+            '''
+            将列+值过滤转换为表达式
+            :param name:
+            :type name:
+            :param value:
+            :type value:
+            '''
             expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, name)
-            supported = True
+            unsupported = []
+            expressions = []
             if column is not None:
                 handler = self._get_filter_handler(_extract_column_visit_name(column))
-                if not isinstance(value, dict):
-                    # op is None
-                    _supported, query = _handle_filter(expr_wrapper, query, handler, None, column, value)
-                    supported = supported and _supported
-                else:
+                if isinstance(value, collections.Mapping):
                     for operator, value in value.items():
-                        _supported, query = _handle_filter(expr_wrapper, query, handler, operator, column, value)
-                        supported = supported and _supported
-            if column is None or not supported:
-                # FIXME: (wujj)ignore or make empty query
-                query = self._unsupported_filter(query, name, value)
+                        expr = _handle_filter(expr_wrapper, handler, operator, column, value)
+                        if expr is not None:
+                            expressions.append(expr)
+                        else:
+                            unsupported.append((name, operator, value))
+                else:
+                    # op is None
+                    expr = _handle_filter(expr_wrapper, handler, None, column, value)
+                    if expr is not None:
+                        expressions.append(expr)
+                    else:
+                        unsupported.append((name, None, value))
+            if column is None:
+                unsupported.insert(0, (name, None, value))
+            if len(expressions) == 0:
+                return unsupported, None
+            if len(expressions) == 1:
+                return unsupported, expressions[0]
+            else:
+                return unsupported, and_(expressions)
+
+        reserved_keys = self._filter_key_mapping()
+        filters = filters or {}
+        orders = orders or []
+        unsupported, expressions = _get_expression(filters)
+        for expr in expressions:
+            query = query.filter(expr)
+        for idx, error_filter in unsupported:
+            name, op, value = error_filter
+            self._unsupported_filter(query, idx, name, op, value)
         for field in orders:
             order = '+'
             if field.startswith('+'):
@@ -392,21 +483,25 @@ class ResourceBase(object):
                 field = field[1:]
             expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, field)
             # 不支持relationship排序
-            if column and expr_wrapper is None:
+            if column is not None and expr_wrapper is None:
                 if order == '+':
                     query = query.order_by(column)
                 else:
                     query = query.order_by(column.desc())
         return query
     
-    def _unsupported_filter(self, query, name, value):
+    def _unsupported_filter(self, query, idx, name, op, value):
         '''
         未默认受支持的过滤条件，因talos以前行为为忽略，因此默认返回query不做任何处理，
         此处可以修改并返回query对象更改默认行为
         :param query: SQL查询对象
         :type query: sqlalchemy.query
+        :param idx: 第N个不支持的过滤操作
+        :type idx: int
         :param name: 过滤字段
         :type name: str
+        :param op: 过滤条件
+        :type op: str
         :param value: 过滤值对象
         :type value: str/list/dict
         '''
