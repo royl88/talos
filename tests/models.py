@@ -34,5 +34,5 @@ class User(Base, dictbase.DictBase):
     name = Column(String(63), nullable=False)
     department_id = Column(ForeignKey(u'department.id', ondelete=u'RESTRICT', onupdate=u'RESTRICT'), nullable=False)
 
-    department = relationship(u'Department')
+    department = relationship(u'Department', lazy=False)
     addresses = relationship(u'Address', lazy=False, back_populates=u'user', uselist=True, viewonly=True)
