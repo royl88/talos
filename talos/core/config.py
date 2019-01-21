@@ -202,10 +202,10 @@ CONFIG_OPTS = {
     },
     'db': {
         'connection': UNSET,
-        'pool_size': 3,
-        'pool_recycle': 60 * 60,
-        'pool_timeout': 5,
-        'max_overflow': 5,
+        # 'pool_size': 3,
+        # 'pool_recycle': 60 * 60,
+        # 'pool_timeout': 5,
+        # 'max_overflow': 5,
     },
     'cache': {
         'type': 'dogpile.cache.memory',

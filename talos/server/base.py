@@ -82,11 +82,7 @@ def initialize_db():
     CONF = config.CONF
     try:
         if CONF.db.connection:
-            pool.POOL.reflesh(param={'connection': CONF.db.connection,
-                                     'pool_size': CONF.db.pool_size,
-                                     'pool_recycle': CONF.db.pool_recycle,
-                                     'pool_timeout': CONF.db.pool_timeout,
-                                     'max_overflow': CONF.db.max_overflow})
+            pool.POOL.reflesh(param=CONF.db.to_dict())
     except AttributeError:
         LOG.warning("config db.connection not set, skip")
 
