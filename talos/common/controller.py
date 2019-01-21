@@ -202,6 +202,7 @@ class CollectionController(Controller, SimplifyMixin):
         :returns: 符合条件的资源数量
         :rtype: int
         """
+        criteria = copy.deepcopy(criteria)
         # remove offset,limit
         criteria.pop('offset', None)
         criteria.pop('limit', None)
@@ -220,6 +221,7 @@ class CollectionController(Controller, SimplifyMixin):
         :returns: 符合条件的资源
         :rtype: list
         """
+        criteria = copy.deepcopy(criteria)
         # 如果用户没有设置limit并且程序中自带了size limit则使用默认limit值
         # 若都没有设置，则检测全局配置是否启用并设置
         if criteria.get('limit', None) is None:
