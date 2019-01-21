@@ -13,7 +13,6 @@ from sqlalchemy.orm import sessionmaker
 from talos.core import config
 from talos.core import decorators as deco
 
-
 CONF = config.CONF
 
 
@@ -79,7 +78,8 @@ class DBPool(object):
             pool_size=param.get('pool_size', 10),
             pool_recycle=param.get('pool_recycle', 600),
             pool_timeout=param.get('pool_timeout', 15),
-            max_overflow=param.get('max_overflow', 10)),
+            max_overflow=param.get('max_overflow', 10)
+            ),
             autocommit=True)
         return True
 
