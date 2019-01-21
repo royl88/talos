@@ -69,18 +69,9 @@ class DBPool(object):
         :returns: 是否重建成功
         :rtype: bool
         """
-        connection = param['connection']
-
-        enabled_log = CONF.log.level.upper() == 'DEBUG'
-        self._pool = sessionmaker(bind=sqlalchemy.create_engine(
-            connection,
-            echo=enabled_log,
-            pool_size=param.get('pool_size', 10),
-            pool_recycle=param.get('pool_recycle', 600),
-            pool_timeout=param.get('pool_timeout', 15),
-            max_overflow=param.get('max_overflow', 10)
-            ),
-            autocommit=True)
+        param.setdefault('echo', CONF.log.level.upper() == 'DEBUG')
+        connection = param.pop('connection')
+        self._pool = sessionmaker(bind=sqlalchemy.create_engine(connection, **param), autocommit=True)
         return True
 
 
