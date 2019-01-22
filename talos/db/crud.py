@@ -470,7 +470,7 @@ class ResourceBase(object):
         unsupported, expressions = _get_expression(filters)
         for expr in expressions:
             query = query.filter(expr)
-        for idx, error_filter in unsupported:
+        for idx, error_filter in enumerate(unsupported):
             name, op, value = error_filter
             self._unsupported_filter(query, idx, name, op, value)
         for field in orders:

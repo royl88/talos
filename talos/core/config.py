@@ -195,6 +195,7 @@ CONFIG_OPTS = {
     'log': {
         'gunicorn_access': './access.log',
         'gunicorn_error': './error.log',
+        "log_console": True,
         'path': './server.log',
         'level': 'INFO',
         'format_string': '%(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s',

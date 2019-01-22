@@ -13,7 +13,6 @@ from logging.handlers import WatchedFileHandler
 
 from talos.core import config
 
-
 CONF = config.CONF
 
 
@@ -39,12 +38,13 @@ def setup():
     formatter = logging.Formatter(fmt=CONF.log.format_string, datefmt=CONF.log.date_format_string)
     handler.setFormatter(formatter)
     logging.getLogger().addHandler(handler)
-    # stream handler
-    handler = logging.StreamHandler()
-    handler.setLevel(levelmap.get(CONF.log.level.upper(), logging.INFO))
-    formatter = logging.Formatter(fmt=CONF.log.format_string, datefmt=CONF.log.date_format_string)
-    handler.setFormatter(formatter)
-    logging.getLogger().addHandler(handler)
+    if CONF.log.log_console:
+        # stream handler
+        handler = logging.StreamHandler()
+        handler.setLevel(levelmap.get(CONF.log.level.upper(), logging.INFO))
+        formatter = logging.Formatter(fmt=CONF.log.format_string, datefmt=CONF.log.date_format_string)
+        handler.setFormatter(formatter)
+        logging.getLogger().addHandler(handler)
     logging.captureWarnings(True)
     loggers_configs = getattr(CONF.log, 'loggers', [])
     for log_config in loggers_configs:
