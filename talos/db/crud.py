@@ -323,8 +323,8 @@ class ResourceBase(object):
 
     def _filter_hander_mapping(self):
         handlers = {
-            'INET': filter_wrapper.FilterNetwork(),
-            'CIDR': filter_wrapper.FilterNetwork(),
+            'inet': filter_wrapper.FilterNetwork(),
+            'cidr': filter_wrapper.FilterNetwork(),
             'small_integer': filter_wrapper.FilterNumber(),
             'integer': filter_wrapper.FilterNumber(),
             'big_integer': filter_wrapper.FilterNumber(),
@@ -344,7 +344,7 @@ class ResourceBase(object):
 
     def _get_filter_handler(self, name):
         handlers = self._filter_hander_mapping()
-        return handlers.get(name, filter_wrapper.Filter())
+        return handlers.get(name.lower(), filter_wrapper.Filter())
 
     def _apply_filters(self, query, orm_meta, filters=None, orders=None):
 
