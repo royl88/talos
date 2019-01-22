@@ -418,7 +418,7 @@ class ResourceBase(object):
             for key_filters in value:
                 _unsupported, expr = _get_expression(key_filters)
                 unsupported.extend(_unsupported)
-                if expr is not None:
+                if expr:
                     expr = and_(*expr)
                     expressions.append(expr)
             if len(expressions) == 0:
