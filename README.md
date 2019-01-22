@@ -1095,13 +1095,13 @@ application = base.initialize_server('cms',
 
 alembic revision --autogenerate -m "add table: xxxxx"
 
-备注不支持中文, autogenerate用于生成upgrade，downgrade函数内容，不指定则为pass，检查升级降级函数是否正确
+备注不支持中文, autogenerate用于生成upgrade，downgrade函数内容，生成后需检查升级降级函数是否正确
 
 升级：alembic upgrade head
 
 降级：alembic downgrade base
 
-head指最新版本，base指最原始版本即当前models - all version，更多升级降级方式如下：
+head指最新版本，base指最原始版本即models第一个version，更多升级降级方式如下：
 
 - alembic upgrade +2 升级2个版本
 
@@ -1118,7 +1118,21 @@ talos生成的项目预置了一些依赖要求，可以更便捷的使用pytest
 
 可以简单从命令行输出中查看结果，或者从unit_test_report.html查看单元测试报告，从htmlcov/index.html中查看覆盖测试报告结果
 
+示例可以从talos源码的tests文件夹中查看
 
+```bash
+$ tree tests
+tests
+├── __init__.py
+├── models.py
+├── test_db_filters.py
+├── unittest.conf
+├── unittest.sqlite3
+└── ...
+
+```
+
+单元测试文件以test_xxxxxx.py作为命名
 
 ## Sphinx注释文档
 
@@ -1263,6 +1277,7 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | server.port                            | int    | 监听端口                                                     | 9001                                                         |
 | server.backlog                         | int    | 监听最大队列数                                               | 2048                                                         |
 | log                                    | dict   | 日志配置项                                                   |                                                              |
+| log.log_console                        | bool   | 是否将日志重定向到标准输出                                   | True                                                         |
 | log.gunicorn_access                    | string | gunicorn的access日志路径                                     | ./access.log                                                 |
 | log.gunicorn_error                     | string | gunicorn的error日志路径                                      | ./error.log                                                  |
 | log.path                               | string | 全局日志路径                                                 | ./server.log                                                 |
