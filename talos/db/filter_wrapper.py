@@ -24,47 +24,6 @@ RE_IP = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
 RE_CIDR_LIKE = re.compile(r'^(\d{1,3}|\d{1,3}\.\d{1,3}|\d{1,3}\.\d{1,3}\.\d{1,3})(\.)?(/\d{1,2})?$')
 
 
-def merge(filters, filters_to_merge):
-    """
-    将filters_to_merage合并到filters中
-
-    :param filters: 待合并的filters(注：内容会被修改并返回)
-    :type filters: dict
-    :param filters_to_merge: 待合并的filters(注：内容会被修改)
-    :type filters_to_merge: dict
-    """
-    keys = set(filters.keys()) & set(filters_to_merge.keys())
-    for key in keys:
-        val = filters[key]
-        other_val = filters_to_merge.pop(key)
-        if isinstance(val, dict) and isinstance(other_val, dict):
-            val.update(other_val)
-        elif isinstance(val, dict) and not isinstance(other_val, dict):
-            if utils.is_list_type(other_val):
-                val['in'] = other_val
-            else:
-                val['eq'] = other_val
-        elif not isinstance(val, dict) and isinstance(other_val, dict):
-            if utils.is_list_type(val):
-                other_val['in'] = val
-            else:
-                other_val['eq'] = val
-            filters[key] = other_val
-        else:
-            nval = {}
-            if utils.is_list_type(val):
-                nval['in'] = val
-            else:
-                nval['eq'] = val
-            if utils.is_list_type(other_val):
-                nval['in'] = other_val
-            else:
-                nval['eq'] = other_val
-            filters[key] = nval
-    filters.update(filters_to_merge)
-    return filters
-
-
 def column_from_expression(table, expression):
     expr_wrapper = None
     if '.' in expression:
