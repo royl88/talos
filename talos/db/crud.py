@@ -462,32 +462,34 @@ class ResourceBase(object):
             if len(expressions) == 1:
                 return unsupported, expressions[0]
             else:
-                return unsupported, and_(expressions)
+                return unsupported, and_(*expressions)
 
         reserved_keys = self._filter_key_mapping()
         filters = filters or {}
+        if filters:
+            unsupported, expressions = _get_expression(filters)
+            for expr in expressions:
+                query = query.filter(expr)
+            for idx, error_filter in enumerate(unsupported):
+                name, op, value = error_filter
+                self._unsupported_filter(query, idx, name, op, value)
         orders = orders or []
-        unsupported, expressions = _get_expression(filters)
-        for expr in expressions:
-            query = query.filter(expr)
-        for idx, error_filter in enumerate(unsupported):
-            name, op, value = error_filter
-            self._unsupported_filter(query, idx, name, op, value)
-        for field in orders:
-            order = '+'
-            if field.startswith('+'):
+        if orders:
+            for field in orders:
                 order = '+'
-                field = field[1:]
-            elif field.startswith('-'):
-                order = '-'
-                field = field[1:]
-            expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, field)
-            # 不支持relationship排序
-            if column is not None and expr_wrapper is None:
-                if order == '+':
-                    query = query.order_by(column)
-                else:
-                    query = query.order_by(column.desc())
+                if field.startswith('+'):
+                    order = '+'
+                    field = field[1:]
+                elif field.startswith('-'):
+                    order = '-'
+                    field = field[1:]
+                expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, field)
+                # 不支持relationship排序
+                if column is not None and expr_wrapper is None:
+                    if order == '+':
+                        query = query.order_by(column)
+                    else:
+                        query = query.order_by(column.desc())
         return query
     
     def _unsupported_filter(self, query, idx, name, op, value):
@@ -527,9 +529,7 @@ class ResourceBase(object):
         """
         orm_meta = orm_meta or self.orm_meta
         filters = filters or {}
-        filters = copy.copy(filters)
-        if not ignore_default:
-            filter_wrapper.merge(filters, self.default_filter)
+        # orders优先使用用户传递排序
         if not ignore_default:
             orders = self.default_order if orders is None else orders
         else:
@@ -553,6 +553,9 @@ class ResourceBase(object):
                 query = query.join(*spec_args,
                                    isouter=item.get('isouter', True))
         query = self._apply_filters(query, orm_meta, filters, orders)
+        # 如果不是忽略default模式，default_filter必须进行过滤
+        if not ignore_default:
+            query = self._apply_filters(query, orm_meta, self.default_filter)
         return query
 
     def _apply_primary_key_filter(self, query, rid):
