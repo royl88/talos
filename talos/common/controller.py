@@ -204,11 +204,8 @@ class CollectionController(Controller, SimplifyMixin):
         """
         criteria = copy.deepcopy(criteria)
         # remove offset,limit
-        criteria.pop('offset', None)
-        criteria.pop('limit', None)
-        criteria.pop('orders', None)
-        criteria.pop('fields', None)
-        return self.make_resource(req).count(**criteria)
+        filters = criteria.pop('filters', None)
+        return self.make_resource(req).count(filters)
 
     def list(self, req, criteria, **kwargs):
         """
