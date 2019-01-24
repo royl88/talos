@@ -29,18 +29,18 @@ cmdclass = {}
 ext_modules = []
 
 setup(
-    name='talos',
+    name='talos-api',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
     version=version,
 
-    description='A Falcon Base, RESTful API Framework',
+    description='A Falcon Base, Powerful RESTful API Framework',
     long_description=long_description,
 
     # The project's main homepage.
-    url='https://github.com/royl88/talos',
+    url='https://gitee.com/wu.jianjun/talos',
 
     # Author details
     author='Roy',
@@ -60,9 +60,6 @@ setup(
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Build Tools',
-
-        # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: Apache-2.0',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
