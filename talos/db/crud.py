@@ -84,7 +84,7 @@ class ColumnValidator(object):
         self.error_msg = error_msg
         self.converter = converter
         self.orm_required = orm_required
-        self.aliases = aliases
+        self.aliases = aliases or []
         self.nullable = nullable
 
         self.validate_on = self._build_situation(self.validate_on)

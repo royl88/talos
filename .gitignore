@@ -17,3 +17,4 @@ htmlcov/
 *.log
 build/*
 dist/*
+/talos_api.egg-info/
