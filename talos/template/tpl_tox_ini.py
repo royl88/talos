@@ -6,13 +6,13 @@ TEMPLATE = u'''# Tox (https://tox.readthedocs.io/) is a tool for running tests
 # and then run "tox" from this directory.
 
 [tox]
-envlist = py27, py35
+envlist = py27, py36
 
 [testenv]
 commands = python setup.py test
 deps =
-    coverage
-    pytest
+    pytest<4.1
     pytest-runner
     pytest-html
+    pytest-cov
 '''

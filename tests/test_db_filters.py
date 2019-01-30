@@ -8,7 +8,7 @@ from talos.server import base
 from talos.db import crud
 from talos.core import exceptions
 
-import models
+from tests import models
 
 base.initialize_server('test', './tests/unittest.conf')
 LOG = logging.getLogger(__name__)
@@ -19,14 +19,15 @@ class _Base(crud.ResourceBase):
     def _unsupported_filter(self, query, idx, name, op, value):
         LOG.error('#############################unsupported filter#####################################')
         LOG.error('index:%(idx)s name:%(name)s op:%(op)s value:%(value)s - %(sql)s' % {'sql': query,
-                                                                      'idx': idx,
-                                                                      'name': name,
-                                                                      'op': op,
-                                                                      'value': value})
+                                                                                       'idx': idx,
+                                                                                       'name': name,
+                                                                                       'op': op,
+                                                                                       'value': value})
         return crud.ResourceBase._unsupported_filter(self, query, idx, name, op, value)
-    
+
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
-        query = crud.ResourceBase._get_query(self, session, orm_meta=orm_meta, filters=filters, orders=orders, joins=joins, ignore_default=ignore_default)
+        query = crud.ResourceBase._get_query(self, session, orm_meta=orm_meta,
+                                             filters=filters, orders=orders, joins=joins, ignore_default=ignore_default)
         LOG.error('#############################get query#####################################')
         LOG.error('%s' % query)
         return query
@@ -38,7 +39,7 @@ class _Department(_Base):
     1     技术部
     2     业务部
     '''
-    
+
     orm_meta = models.Department
 
 
@@ -52,7 +53,7 @@ class _User(_Base):
     '''
     orm_meta = models.User
 
-    
+
 class _UserWithFilter(_Base):
     orm_meta = models.User
     _default_filter = {'age': {'lte': 3, 'gte': 1}}
@@ -65,7 +66,7 @@ class _Address(_Base):
     2     广州        1
     3     随机        3
     '''
-    
+
     orm_meta = models.Address
 
 
@@ -109,7 +110,6 @@ def test_list_or_2():
 
 def test_list_or_3():
     users = _User().list(filters={'$or': [{'fidnomore': '1'}]})
-    print users
     assert len(users) > 1
 
 
@@ -117,7 +117,7 @@ def test_list_or_4():
     users = _User().list(filters={'$or': [{'age': {'like': 3}}]})
     assert len(users) > 1
 
-        
+
 def test_list_and_1():
     # WHERE department.id = user.department_id AND department.id = ?)) AND user.age IS NULL
     users = _User().list(filters={'$and': [{'id': '3'}, {'name': 'Rachel'}, {'department.id': '2'}, {'age': None}]})
@@ -127,8 +127,8 @@ def test_list_and_1():
 
 
 def test_list_and_2():
-    # WHERE user.age IS NULL AND (EXISTS (SELECT 1 
-    # FROM department 
+    # WHERE user.age IS NULL AND (EXISTS (SELECT 1
+    # FROM department
     # WHERE department.id = user.department_id AND department.id = ?)) AND user.id = ? AND user.name = ?
     users = _User().list(filters={'id': '3', 'name': 'Rachel', 'department.id': '2', 'age': None})
     assert len(users) == 1
@@ -139,31 +139,34 @@ def test_list_and_2():
 def test_list_complicate_1():
     # WHERE user.id = ? AND user.name = ? OR user.id = ? AND user.name = ? OR user.id = ?
     users = _User().list(filters={'$or': [
-                                            {'$and': [{'id': '1'}, {'name': 'Deke'}]},
-                                            {'$and': [{'id': '2'}, {'name': 'Jacob'}]},
-                                            {'id': '3'}
-                                         ],
-                                  }
-                        )
+        {'$and': [{'id': '1'}, {'name': 'Deke'}]},
+        {'$and': [{'id': '2'}, {'name': 'Jacob'}]},
+        {'id': '3'}
+    ],
+    }
+    )
     assert len(users) == 3
     for u in users:
         assert u['id'] in ('1', '2', '3')
 
 
 def test_list_complicate_2():
-    # WHERE user.id = ? AND user.name = ? AND (EXISTS (SELECT 1 
-    # FROM department 
+    # WHERE user.id = ? AND user.name = ? AND (EXISTS (SELECT 1
+    # FROM department
     # WHERE department.id = user.department_id AND department.id = ?)) AND user.age < ? AND user.age > ?
-    users = _User().list(filters={'$and': [{'id': '2'}, {'name': 'Jacob'}, {'department.id': '1'}, {'age': {'gt': 15, 'lt': 17}}]})
+    users = _User().list(filters={'$and': [{'id': '2'}, {'name': 'Jacob'},
+                                           {'department.id': '1'}, {'age': {'gt': 15, 'lt': 17}}]})
     assert len(users) == 1
     assert users[0]['id'] == '2'
-    
+
 
 def test_list_complicate_3():
-    # WHERE (EXISTS (SELECT 1 
-    # FROM department 
-    # WHERE department.id = user.department_id AND department.id = ?)) AND (user.age < ? AND user.age > ? OR user.age IS NULL)
-    users = _User().list(filters={'$and': [{'department.id': '2'} , {'$or': [{'age': {'gt': 2, 'lt': 4}}, {'age': None}]}]})
+    # WHERE (EXISTS (SELECT 1
+    # FROM department
+    # WHERE department.id = user.department_id AND department.id = ?)) AND
+    # (user.age < ? AND user.age > ? OR user.age IS NULL)
+    users = _User().list(filters={'$and': [{'department.id': '2'}, {
+        '$or': [{'age': {'gt': 2, 'lt': 4}}, {'age': None}]}]})
     assert len(users) == 2
     for u in users:
         assert u['id'] in ('3', '4',)
@@ -187,7 +190,7 @@ def test_update_rollback():
 def test_get_1():
     addr = _Address().get('3')
     assert addr['id'] == '3'
-    
+
 
 def test_get_2():
     addr = _Address().get(('3',))
@@ -203,28 +206,29 @@ def test_get_error():
     with pytest.raises(exceptions.CriticalError):
         addr = _Address().get(('3', 'something'))
 
-    
+
 def test_create():
     with _Address().transaction() as session:
-        addr = _Address(transaction=session).create(resource={'id': 'auto_test_gen', 'location': 'auto_test_gen', 'user_id': '3'})
+        addr = _Address(transaction=session).create(
+            resource={'id': 'auto_test_gen', 'location': 'auto_test_gen', 'user_id': '3'})
         assert addr['id'] == 'auto_test_gen'
         count, addrs = _Address(transaction=session).delete('auto_test_gen')
         assert count == 1
         assert addrs[0]['id'] == 'auto_test_gen'
 
-        
+
 def test_count():
     count = _User().count({'id': '3'})
     assert count == 1
 
-    
+
 def test_default_filter():
     # WHERE user.age > ? AND user.age = ? AND user.age >= ? AND user.age <= ?
     users = _UserWithFilter().list({'age': {'eq': 3, 'gt': 1}})
     assert len(users) == 1
     assert users[0]['id'] == '4'
 
-    
+
 def test_unsupported_column():
     users = _UserWithFilter().list({'kagenomore': {'eq': 3, 'gt': 1}})
     assert len(users) == 1

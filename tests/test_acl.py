@@ -2,7 +2,6 @@
 import pytest
 
 from talos.core import acl
-from __builtin__ import object
 
 # list_user：列出所有用户
 # create_user：创建用户
@@ -76,6 +75,8 @@ def test_allow():
     assert access.is_allowed(
         [('*', 'admin')], 'a', 'list_user') is True
     assert access.is_allowed(
+        [('a[123]b', 'admin')], 'a3b', 'list_user') is True
+    assert access.is_allowed(
         [('*', 'admin')], 'a', 'create_user') is True
     assert access.is_allowed(
         [('*', 'admin')], 'a', 'update_user') is True
@@ -110,6 +111,8 @@ def test_deny():
 def test_none():
     access = build_acl(ACL_POLICY_1)
     assert access.is_allowed(
+        [('a[123]b', 'admin')], 'a3', 'list_user') is None
+    assert access.is_allowed(
         [('a', 'admin')], 'b', 'spec_allow') is None
     assert access.is_allowed(
         [('a', 'readonly')], 'a', 'spec_allow') is None
@@ -125,6 +128,8 @@ def test_object_allow():
     access = build_object_acl(ACL_POLICY_1)
     assert access.is_allowed(
         [('*', PolicyProxy('admin'))], 'a', ActionProxy('list_user')) is True
+    assert access.is_allowed(
+        [('a[123]b', PolicyProxy('admin'))], 'a3b', ActionProxy('list_user')) is True
     assert access.is_allowed(
         [('*', PolicyProxy('admin'))], 'a', ActionProxy('create_user')) is True
     assert access.is_allowed(
@@ -160,6 +165,8 @@ def test_object_deny():
 
 def test_object_none():
     access = build_object_acl(ACL_POLICY_1)
+    assert access.is_allowed(
+        [('a[123]b', PolicyProxy('admin'))], 'a3', ActionProxy('list_user')) is None
     assert access.is_allowed(
         [('a', PolicyProxy('admin'))], 'b', ActionProxy('spec_allow')) is None
     assert access.is_allowed(
