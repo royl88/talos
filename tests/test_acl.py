@@ -4,7 +4,6 @@ import pytest
 from talos.core import acl
 from __builtin__ import object
 
-
 # list_user：列出所有用户
 # create_user：创建用户
 # update_user：更新用户
@@ -25,6 +24,7 @@ ACL_POLICY_1 = {
 
 
 class PolicyProxy(object):
+
     def __init__(self, name):
         self._name = name
 
@@ -33,6 +33,7 @@ class PolicyProxy(object):
 
 
 class ActionProxy(object):
+
     def __init__(self, name):
         self._name = name
 
@@ -73,25 +74,29 @@ def build_object_acl(data):
 def test_allow():
     access = build_acl(ACL_POLICY_1)
     assert access.is_allowed(
-        [('*', 'admin')], '', 'list_user') is True
+        [('*', 'admin')], 'a', 'list_user') is True
     assert access.is_allowed(
-        [('*', 'admin')], '', 'create_user') is True
+        [('*', 'admin')], 'a', 'create_user') is True
     assert access.is_allowed(
-        [('*', 'admin')], '', 'update_user') is True
+        [('*', 'admin')], 'a', 'update_user') is True
     assert access.is_allowed(
-        [('*', 'admin')], '', 'delete_user') is True
+        [('*', 'admin')], 'a', 'delete_user') is True
     assert access.is_allowed(
-        [('*', 'admin')], '', 'list_me') is True
+        [('*', 'admin')], 'a', 'list_me') is True
     assert access.is_allowed(
-        [('*', 'admin')], '', 'update_me') is True
+        [('*', 'admin')], 'a', 'update_me') is True
     assert access.is_allowed(
-        [('*', 'admin')], '', 'spec_allow') is True
+        [('*', 'admin')], 'a', 'spec_allow') is True
     assert access.is_allowed(
         [('a', 'admin')], 'a', 'spec_allow') is True
     assert access.is_allowed(
         [(('a', '*'), 'admin')], ('a', '1'), 'spec_allow') is True
     assert access.is_allowed(
-        [(('a', '1'), 'admin'), (('a', '2'), 'admin')], ('a', '2'), 'spec_allow') is True
+        [(('a', '1'), 'readonly'), (('a', '2'), 'admin')], ('a', '2'), 'spec_allow') is True
+    assert access.is_allowed(
+        [(('a', '1'), 'readonly'), (('a', '2'), 'spec')], ('a', '2'), 'spec_allow') is True
+    assert access.is_allowed(
+        [('*', 'spec')], '', 'spec_allow') is True
 
 
 def test_deny():
@@ -107,35 +112,42 @@ def test_none():
     assert access.is_allowed(
         [('a', 'admin')], 'b', 'spec_allow') is None
     assert access.is_allowed(
+        [('a', 'readonly')], 'a', 'spec_allow') is None
+    assert access.is_allowed(
         [(('a', '1'), 'admin')], ('a', '2'), 'spec_allow') is None
     assert access.is_allowed(
         [(('a', '1'), 'admin'), (('a', '2'), 'readonly')], ('a', '2'), 'spec_allow') is None
     assert access.is_allowed(
-        [('*', 'readwrite')], '', 'disable_none') is None
+        [('*', 'readwrite')], '', 'undefined') is None
 
 
 def test_object_allow():
     access = build_object_acl(ACL_POLICY_1)
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('list_user')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('list_user')) is True
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('create_user')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('create_user')) is True
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('update_user')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('update_user')) is True
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('delete_user')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('delete_user')) is True
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('list_me')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('list_me')) is True
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('update_me')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('update_me')) is True
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('spec_allow')) is True
+        [('*', PolicyProxy('admin'))], 'a', ActionProxy('spec_allow')) is True
     assert access.is_allowed(
         [('a', PolicyProxy('admin'))], 'a', ActionProxy('spec_allow')) is True
     assert access.is_allowed(
         [(('a', '*'), PolicyProxy('admin'))], ('a', '1'), ActionProxy('spec_allow')) is True
+    # mix policy type
     assert access.is_allowed(
-        [(('a', '1'), PolicyProxy('admin')), (('a', '2'), PolicyProxy('admin'))], ('a', '2'), ActionProxy('spec_allow')) is True
+        [(('a', '1'), PolicyProxy('readonly')), (('a', '2'), 'admin')], ('a', '2'), ActionProxy('spec_allow')) is True
+    assert access.is_allowed(
+        [(('a', '1'), PolicyProxy('readonly')), (('a', '2'), PolicyProxy('spec'))], ('a', '2'), ActionProxy('spec_allow')) is True
+    assert access.is_allowed(
+        [('*', PolicyProxy('spec'))], '', ActionProxy('spec_allow')) is True
 
 
 def test_object_deny():
@@ -151,18 +163,38 @@ def test_object_none():
     assert access.is_allowed(
         [('a', PolicyProxy('admin'))], 'b', ActionProxy('spec_allow')) is None
     assert access.is_allowed(
+        [('a', PolicyProxy('readonly'))], 'a', ActionProxy('spec_allow')) is None
+    assert access.is_allowed(
         [(('a', '1'), PolicyProxy('admin'))], ('a', '2'), ActionProxy('spec_allow')) is None
     assert access.is_allowed(
         [(('a', '1'), PolicyProxy('admin')), (('a', '2'), PolicyProxy('readonly'))], ('a', '2'), ActionProxy('spec_allow')) is None
     assert access.is_allowed(
-        [('*', PolicyProxy('readwrite'))], '', ActionProxy('disable_none')) is None
+        [('*', PolicyProxy('readwrite'))], '', ActionProxy('undefined')) is None
 
 
 def test_error():
     access = build_object_acl(ACL_POLICY_1)
     with pytest.raises(ValueError):
         access.is_allowed(
-            [('*', PolicyProxy('admin'))], None, ActionProxy('disable_me'))
+            [('*', 'admin')], None, 'anything')
+    with pytest.raises(ValueError):
+        access.is_allowed(
+            [('*', PolicyProxy('admin'))], None, ActionProxy('anything'))
+    with pytest.raises(ValueError):
+        access.is_allowed(
+            [(('t1', 't2'), PolicyProxy('admin'))], None, ActionProxy('anything'))
+    with pytest.raises(ValueError):
+        access.is_allowed(
+            [(None, PolicyProxy('admin'))], '', ActionProxy('anything'))
+    with pytest.raises(ValueError):
+        access.is_allowed(
+            [(None, PolicyProxy('admin'))], ('i1', 'i2'), ActionProxy('anything'))
+    with pytest.raises(ValueError):
+        access.is_allowed(
+            [(('t1', 't2'), PolicyProxy('admin'))], 'i1', ActionProxy('anything'))
+    with pytest.raises(ValueError):
+        access.is_allowed(
+            [('t1', PolicyProxy('admin'))], ('i1', 'i2'), ActionProxy('anything'))
 
 
 def test_none_pass():
@@ -172,7 +204,4 @@ def test_none_pass():
     assert access.is_allowed(
         [(None, PolicyProxy('admin'))], None, ActionProxy('disable_me')) is False
     assert access.is_allowed(
-        [('*', PolicyProxy('admin'))], '', ActionProxy('disable_me')) is False
-
-
-test_none_pass()
+        [(None, PolicyProxy('admin'))], None, ActionProxy('undefined')) is None
