@@ -7,6 +7,7 @@
 from __future__ import absolute_import
 
 import fnmatch
+from talos.core import utils
 
 __all__ = ["Registry"]
 
@@ -167,7 +168,12 @@ class Registry(object):
                     isinstance(context, (list, tuple)) ^ isinstance(instance, (list, tuple)):
                 raise ValueError(
                     'template type mismatch with instance')
-            results = map(self._match, zip(instance, context))
+            results = []
+            if utils.is_string_type(context) and utils.is_string_type(instance):
+                # don't map it
+                results = [self._match((instance, context))]
+            else:
+                results = list(map(self._match, zip(instance, context)))
             if len(results) == 0 or sum(results) == len(results):
                 policies.add(policy_key)
 
