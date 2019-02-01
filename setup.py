@@ -4,9 +4,6 @@
 from codecs import open
 import glob
 from os import path
-import os
-import platform
-import shutil
 import sys
 
 from setuptools import setup, find_packages, Extension
@@ -27,6 +24,54 @@ data_files = []
 
 cmdclass = {}
 ext_modules = []
+
+# JYTHON = 'java' in sys.platform
+#
+# try:
+#     sys.pypy_version_info
+#     PYPY = True
+# except AttributeError:
+#     PYPY = False
+#
+# if PYPY or JYTHON:
+#     CYTHON = False
+# else:
+#     try:
+#         from Cython.Distutils import build_ext
+#         CYTHON = True
+#     except ImportError:
+#         print('\nNOTE: Cython not installed. '
+#               'talos will still work fine, but may run '
+#               'a bit slower.\n')
+#         CYTHON = False
+#
+# if CYTHON:
+#     def list_modules(dirname):
+#         filenames = glob.glob(path.join(dirname, '*.py'))
+#
+#         module_names = []
+#         for name in filenames:
+#             module, ext = path.splitext(path.basename(name))
+#             if module != '__init__':
+#                 module_names.append(module)
+#
+#         return module_names
+#
+#     package_names = ['talos.common', 'talos.core', 'talos.db', 'talos.middlewares']
+#     ext_modules = [
+#         Extension(
+#             package + '.' + module,
+#             [path.join(*(package.split('.') + [module + '.py']))]
+#         )
+#         for package in package_names
+#         for module in list_modules(path.join(here, *package.split('.')))
+#     ]
+#
+#     cmdclass = {'build_ext': build_ext}
+#
+# else:
+#     cmdclass = {}
+#     ext_modules = []
 
 setup(
     name='talos-api',
