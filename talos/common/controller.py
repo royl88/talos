@@ -58,7 +58,7 @@ class Controller(object):
                                    ['col__in']意味着col仅支持in查询
                                    ['col__*']意味着col支持所有带条件查询
         :type supported_filters: list
-        :returns: {'filters': filters, 'offset': offset, 'limit': limit}
+        :returns: {'filters': filters, 'offset': offset, 'limit': limit, 'fields': fields}
         :rtype: dict
         """
 
@@ -69,7 +69,7 @@ class Controller(object):
                 if fnmatch.fnmatch(name, pattern_filter):
                     return True
             return False
-        
+
         def _transform_comparator(mappings, comparator):
             if CONF.strict_criteria_transform:
                 return mappings.get(comparator, None)
@@ -81,7 +81,7 @@ class Controller(object):
             return None
 
         query_dict = {}
-        reg = re.compile('^(.+)\[(\d+)\]$')
+        reg = re.compile(r'^(.+)\[(\d+)\]$')
         for key, value in req.params.items():
             matches = reg.match(key)
             if matches:
@@ -116,20 +116,23 @@ class Controller(object):
         orders = None
         fields = None
 
-        if query_dict is None:
-            return filters, offset, limit
-        if '__offset' in query_dict:
-            offset = int(query_dict.pop('__offset'))
-        if '__limit' in query_dict:
-            limit = int(query_dict.pop('__limit'))
-        if '__orders' in query_dict:
-            orders = query_dict.pop('__orders')
+        key_offset = CONF.controller.criteria_key.offset
+        key_limit = CONF.controller.criteria_key.limit
+        key_orders = CONF.controller.criteria_key.orders
+        key_fields = CONF.controller.criteria_key.fields
+
+        if key_offset in query_dict:
+            offset = int(query_dict.pop(key_offset))
+        if key_limit in query_dict:
+            limit = int(query_dict.pop(key_limit))
+        if key_orders in query_dict:
+            orders = query_dict.pop(key_orders)
             if utils.is_list_type(orders):
                 orders = [order.strip() for order in orders]
             else:
                 orders = [orders.strip()]
-        if '__fields' in query_dict:
-            fields = query_dict.pop('__fields')
+        if key_fields in query_dict:
+            fields = query_dict.pop(key_fields)
             if utils.is_list_type(fields):
                 fields = [f.strip() for f in fields]
             else:
@@ -224,8 +227,8 @@ class CollectionController(Controller, SimplifyMixin):
         if criteria.get('limit', None) is None:
             if self.list_size_limit is not None:
                 criteria['limit'] = self.list_size_limit
-            elif CONF.global_list_size_limit_enabled and CONF.global_list_size_limit is not None:
-                criteria['limit'] = CONF.global_list_size_limit
+            elif CONF.controller.list_size_limit_enabled and CONF.controller.list_size_limit is not None:
+                criteria['limit'] = CONF.controller.list_size_limit
         fields = criteria.pop('fields', None)
         refs = self.make_resource(req).list(**criteria)
         if fields is not None:

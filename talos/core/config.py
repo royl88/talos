@@ -183,14 +183,22 @@ CONFIG_OPTS = {
     'language': 'en',
     'locale_app': UNSET,
     'locale_path': UNSET,
-    'global_list_size_limit_enabled': False,
-    'global_list_size_limit': None,
     'override_defalut_middlewares': False,
     'strict_criteria_transform': False,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
         'backlog': 2048,
+    },
+    'controller': {
+        'list_size_limit_enabled': False,
+        'list_size_limit': None,
+        'criteria_key': {
+            'offset': '__offset',
+            'limit': '__limit',
+            'orders': '__orders',
+            'fields': '__fields'
+        }
     },
     'log': {
         'gunicorn_access': './access.log',
