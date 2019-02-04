@@ -1268,8 +1268,12 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | language                               | string | 系统语言翻译                                                 | en                                                           |
 | locale_app                             | string | 国际化locale应用名称                                         | 当前项目名                                                   |
 | locale_path                            | string | 国际化locale文件路径                                         | ./etc/locale                                                 |
-| global_list_size_limit_enabled         | bool   | 是否启用全局列表大小限制                                     | False                                                        |
-| global_list_size_limit                 | int    | 全局列表数据大小，如果没有设置，则默认返回全部，如果用户传入limit参数，则以用户参数为准 | None                                                         |
+| controller.list_size_limit_enabled     | bool   | 是否启用全局列表大小限制                                     | False                                                        |
+| controller.list_size_limit             | int    | 全局列表数据大小，如果没有设置，则默认返回全部，如果用户传入limit参数，则以用户参数为准 | None                                                         |
+| controller.criteria_key.offset         | string | controller接受用户的offset参数的关键key值                    | __offset                                                     |
+| controller.criteria_key.limit          | string | controller接受用户的limit参数的关键key值                     | __limit                                                      |
+| controller.criteria_key.orders         | string | controller接受用户的orders参数的关键key值                    | __orders                                                     |
+| controller.criteria_key.fields         | string | controller接受用户的fields参数的关键key值                    | __fields                                                     |
 | strict_criteria_transform              | bool   | 是否使用严格查询条件模式，如果True，则表示仅支持greater类查询，False则同时支持greater，gt类查询 | Flase                                                        |
 | override_defalut_middlewares           | bool   | 覆盖系统默认加载的中间件                                     | Flase                                                        |
 | server                                 | dict   | 服务监听配置项                                               |                                                              |
