@@ -20,7 +20,6 @@ from talos.core import config
 from talos.core import exceptions
 from talos.core.i18n import _
 
-
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
@@ -32,8 +31,8 @@ def get_ipaddr(request):
 class RateLimitExceeded(exceptions.Error):
     code = 429
 
-    def __init__(self, message=None, limit=None, **kwargs):
-        self.limit = limit
+    def __init__(self, message=None, **kwargs):
+        self.limit = kwargs.get('limit', None)
         super(RateLimitExceeded, self).__init__(message, **kwargs)
 
     @property
@@ -60,14 +59,14 @@ class Limiter(object):
                  header_limit=None):
         conf_limits = CONF.rate_limit.global_limits if global_limits is None else global_limits
         callback = self.__raise_exceeded
-        self.enabled = enabled or CONF.rate_limit.enabled
+        self.enabled = CONF.rate_limit.enabled if enabled is None else enabled
         self.strategy = strategy or CONF.rate_limit.strategy
         if self.strategy not in STRATEGIES:
             raise ConfigurationError(_("invalid rate limiting strategy: %(strategy)s") % {'strategy': self.strategy})
         self.storage = storage_from_string(storage_url or CONF.rate_limit.storage_url)
         self.limiter = STRATEGIES[self.strategy](self.storage)
         self.key_function = get_ipaddr
-        self.per_method = per_method or CONF.rate_limit.per_method
+        self.per_method = CONF.rate_limit.per_method if per_method is None else per_method
         self.global_limits = []
         if conf_limits:
             self.global_limits = [
@@ -89,7 +88,7 @@ class Limiter(object):
             hit_message = hit_message % {
                 'limit': limit[0].amount, 'remaining': window_stats[1], 'reset': int(window_stats[0] - time.time())}
             raise RateLimitExceeded(message=hit_message)
-        raise RateLimitExceeded(limit=limit)
+        raise RateLimitExceeded(limit=limit[0])
 
     def process_resource(self, request, response, resource, params):
         limiter_key = resource
