@@ -32,6 +32,10 @@ def get_ipaddr(request):
 class RateLimitExceeded(exceptions.Error):
     code = 429
 
+    def __init__(self, message=None, limit=None, **kwargs):
+        self.limit = limit
+        super(RateLimitExceeded, self).__init__(message, **kwargs)
+
     @property
     def title(self):
         return _('Rate Limit Exceeded')
@@ -45,17 +49,25 @@ class Limiter(object):
     """
     """
 
-    def __init__(self):
-        conf_limits = CONF.rate_limit.global_limits
+    def __init__(self,
+                 enabled=None,
+                 global_limits=None,
+                 strategy=None,
+                 storage_url=None,
+                 per_method=None,
+                 header_reset=None,
+                 header_remaining=None,
+                 header_limit=None):
+        conf_limits = CONF.rate_limit.global_limits if global_limits is None else global_limits
         callback = self.__raise_exceeded
-        self.enabled = CONF.rate_limit.enabled
-        self.strategy = CONF.rate_limit.strategy
+        self.enabled = enabled or CONF.rate_limit.enabled
+        self.strategy = strategy or CONF.rate_limit.strategy
         if self.strategy not in STRATEGIES:
             raise ConfigurationError(_("invalid rate limiting strategy: %(strategy)s") % {'strategy': self.strategy})
-        self.storage = storage_from_string(CONF.rate_limit.storage_url)
+        self.storage = storage_from_string(storage_url or CONF.rate_limit.storage_url)
         self.limiter = STRATEGIES[self.strategy](self.storage)
         self.key_function = get_ipaddr
-        self.per_method = CONF.rate_limit.per_method
+        self.per_method = per_method or CONF.rate_limit.per_method
         self.global_limits = []
         if conf_limits:
             self.global_limits = [
@@ -64,17 +76,23 @@ class Limiter(object):
                 )
             ]
         self.header_mapping = {
-            'header_reset': CONF.rate_limit.header_reset,
-            'header_remaining': CONF.rate_limit.header_remaining,
-            'header_limit': CONF.rate_limit.header_limit,
+            'header_reset': header_reset or CONF.rate_limit.header_reset,
+            'header_remaining': header_remaining or CONF.rate_limit.header_remaining,
+            'header_limit': header_limit or CONF.rate_limit.header_limit,
         }
         self.callback = callback
 
-    def __raise_exceeded(self, limit):
+    def __raise_exceeded(self, limit, hit_message=None):
+        # 如果用户定义了错误消息，则直接使用消息内容
+        if hit_message:
+            window_stats = self.limiter.get_window_stats(*limit)
+            hit_message = hit_message % {
+                'limit': limit[0].amount, 'remaining': window_stats[1], 'reset': int(window_stats[0] - time.time())}
+            raise RateLimitExceeded(message=hit_message)
         raise RateLimitExceeded(limit=limit)
 
     def process_resource(self, request, response, resource, params):
-        limiter_key = getattr(resource, "on_" + request.method.lower(), None)
+        limiter_key = resource
         if limiter_key and inspect.ismethod(limiter_key):
             limiter_key = limiter_key.__func__
         limiter_name = resource.__module__ + "." + resource.__class__.__name__ + ":on_" + request.method
@@ -85,23 +103,25 @@ class Limiter(object):
         if limiter_key in LIMITEDS:
             limits = LIMITEDS[limiter_key]
         limit_for_header = None
-        failed_limit = None
+        failed_limit = False
+        failed_message = None
         for lim in limits:
             limit_scope = lim.get_scope(resource, request)
             cur_limits = lim.get_limits(resource, request)
+            failed_message = lim.get_message()
             for cur_limit in cur_limits:
                 if not limit_for_header or cur_limit < limit_for_header[0]:
                     limit_for_header = (cur_limit, (lim.key_func or self.key_function)(request), limit_scope)
                 if not self.limiter.hit(cur_limit, (lim.key_func or self.key_function)(request), limit_scope):
                     LOG.warning("rate limit exceeded for %s (%s)", limiter_name, cur_limit)
-                    failed_limit = cur_limit
+                    failed_limit = True
                     limit_for_header = (cur_limit, (lim.key_func or self.key_function)(request), limit_scope)
                     break
             if failed_limit:
                 break
         request.x_rate_limit = limit_for_header
         if failed_limit:
-            return self.callback(failed_limit)
+            return self.callback(limit_for_header, failed_message)
 
     def process_response(self, request, response, resource):
         """
@@ -112,7 +132,7 @@ class Limiter(object):
         current_limit = getattr(request, "x_rate_limit", None)
         if self.enabled and current_limit:
             window_stats = self.limiter.get_window_stats(*current_limit)
-            response.set_header(self.header_mapping['header_limit'], str(current_limit[0].amount))
+            response.set_header(self.header_mapping['header_limit'], current_limit[0].amount)
             response.set_header(self.header_mapping['header_remaining'], window_stats[1])
             response.set_header(self.header_mapping['header_reset'], int(window_stats[0] - time.time()))
         return response

@@ -14,11 +14,12 @@ class LimitWrapper(object):
     封装调用频率限制所需的上下文
     """
 
-    def __init__(self, limits, key_func, scope, per_method=True):
+    def __init__(self, limits, key_func, scope, per_method=True, msg_fmt=None):
         self._limits = limits
         self._scope = scope
         self.per_method = per_method
         self.key_func = key_func
+        self.msg_fmt = msg_fmt
 
     def get_limits(self, resource, request):
         return list(parse_many(self._limits(request))) if callable(self._limits) else self._limits
@@ -32,3 +33,6 @@ class LimitWrapper(object):
         if self.per_method:
             scope = ':'.join([scope, request.method.lower()])
         return scope
+
+    def get_message(self):
+        return self.msg_fmt
