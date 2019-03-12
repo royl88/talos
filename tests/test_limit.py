@@ -5,15 +5,14 @@ from __future__ import absolute_import
 import time
 import falcon
 from falcon import testing
-import pytest
 
-from talos.middlewares.limiter import RateLimitExceeded
 from talos.middlewares import limiter
 from talos.common import decorators as deco
 
 
-@deco.limit_class('1/second')
+@deco.limit('1/second')
 class ControllerPerMethod(object):
+
     def on_get(self, req, resp):
         pass
 
@@ -21,8 +20,9 @@ class ControllerPerMethod(object):
         pass
 
 
-@deco.limit_class('1/second', per_method=False)
+@deco.limit('1/second', per_method=False)
 class ControllerPerCtl(object):
+
     def on_get(self, req, resp):
         pass
 
@@ -30,8 +30,9 @@ class ControllerPerCtl(object):
         pass
 
 
-@deco.limit_class('1/second', msg_fmt='ooh, max access: %(limit)s time reach, you can retry after %(reset)s seconds')
+@deco.limit('1/second', msg_fmt='ooh, max access: %(limit)s time reach, you can retry after %(reset)s seconds')
 class ControllerUserMsg(object):
+
     def on_get(self, req, resp):
         pass
 
@@ -41,15 +42,15 @@ def key_extract(req):
     return data['name']
 
 
-@deco.limit_class('1/second', key_function=key_extract)
+@deco.limit('1/second', key_function=key_extract)
 class ControllerUserKeyFunc(object):
+
     def on_get(self, req, resp):
         pass
 
 
 def error_http_exception(ex, req, resp, params):
     """捕获并转换内部Exception为falcon Exception"""
-    print(ex)
     http_status = 'HTTP_' + str(getattr(ex, 'code', 500))
     if hasattr(falcon, http_status):
         http_status = getattr(falcon, http_status)
@@ -77,7 +78,7 @@ def error_serializer(req, resp, exception):
 
 
 app = falcon.API(middleware=[limiter.Limiter(True, [], 'fixed-window',
-                                             'memory://', True, 'X-RESET', 'X-REMAIN', 'X-LIMIT')])
+                                             'memory://', False, 'X-RESET', 'X-REMAIN', 'X-LIMIT')])
 app.add_route('/permethod', ControllerPerMethod())
 app.add_route('/perctl', ControllerPerCtl())
 app.add_route('/usermsg', ControllerUserMsg())
@@ -85,9 +86,9 @@ app.add_route('/userkeyfunc', ControllerUserKeyFunc())
 app.add_error_handler(Exception, error_http_exception)
 app.set_error_serializer(error_serializer)
 client = testing.TestClient(app)
-from wsgiref.simple_server import make_server
-httpd = make_server('0.0.0.0', 9000, app)
-httpd.serve_forever()
+# from wsgiref.simple_server import make_server
+# httpd = make_server('0.0.0.0', 9000, app)
+# httpd.serve_forever()
 
 
 def test_permethod_ok():
@@ -116,7 +117,7 @@ def test_usermsg_limit():
     client.simulate_get('/usermsg')
     resp = client.simulate_get('/usermsg')
     assert resp.status == falcon.HTTP_429
-    assert resp.json['message'].startswith('ooh, max accesss')
+    assert resp.json['description'].startswith(u'ooh, max access')
 
 
 def test_userkeyfunc_ok():
