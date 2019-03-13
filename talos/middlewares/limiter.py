@@ -12,12 +12,10 @@ import time
 from limits.errors import ConfigurationError
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES
-from limits.util import parse_many
 
 from talos.common.decorators import LIMITEDS, LIMITED_EXEMPT
-from talos.common.limitwrapper import LimitWrapper
+from talos.common import limitwrapper
 from talos.core import config
-from talos.core import exceptions
 from talos.core.i18n import _
 import functools
 
@@ -27,22 +25,6 @@ CONF = config.CONF
 
 def get_ipaddr(request):
     return request.access_route[0]
-
-
-class RateLimitExceeded(exceptions.Error):
-    code = 429
-
-    def __init__(self, message=None, **kwargs):
-        self.limit = kwargs.get('limit', None)
-        super(RateLimitExceeded, self).__init__(message, **kwargs)
-
-    @property
-    def title(self):
-        return _('Rate Limit Exceeded')
-
-    @property
-    def message_format(self):
-        return _('detail: rate limit exceeded, %(limit)s')
 
 
 class Limiter(object):
@@ -96,7 +78,7 @@ class Limiter(object):
         self.global_limits = []
         if conf_limits:
             self.global_limits = [
-                LimitWrapper(
+                limitwrapper.LimitWrapper(
                     conf_limits, self.key_function, None, self.per_method
                 )
             ]
@@ -119,8 +101,8 @@ class Limiter(object):
             window_stats = limiter.get_window_stats(*limit)
             hit_message = hit_message % {
                 'limit': limit[0].amount, 'remaining': window_stats[1], 'reset': int(window_stats[0] - time.time())}
-            raise RateLimitExceeded(message=hit_message)
-        raise RateLimitExceeded(limit=limit[0])
+            raise limitwrapper.RateLimitExceeded(message=hit_message)
+        raise limitwrapper.RateLimitExceeded(limit=limit[0])
 
     def process_resource(self, request, response, resource, params):
         limiter_key = resource
