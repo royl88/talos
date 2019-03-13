@@ -7,6 +7,24 @@
 from __future__ import absolute_import
 
 from limits.util import parse_many
+from talos.core import exceptions
+from talos.core.i18n import _
+
+
+class RateLimitExceeded(exceptions.Error):
+    code = 429
+
+    def __init__(self, message=None, **kwargs):
+        self.limit = kwargs.get('limit', None)
+        super(RateLimitExceeded, self).__init__(message, **kwargs)
+
+    @property
+    def title(self):
+        return _('Rate Limit Exceeded')
+
+    @property
+    def message_format(self):
+        return _('detail: rate limit exceeded, %(limit)s')
 
 
 class LimitWrapper(object):

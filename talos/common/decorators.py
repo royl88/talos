@@ -9,7 +9,7 @@ from __future__ import absolute_import
 import functools
 from limits.util import parse_many
 
-from talos.common.limitwrapper import LimitWrapper
+from talos.common import limitwrapper
 
 LIMITEDS = {}
 LIMITED_EXEMPT = {}
@@ -32,7 +32,7 @@ def limit(limit_value, key_function=None, scope=None, per_method=True, strategy=
         def __inner(*args, **kwargs):
             instance = fn(*args, **kwargs)
             LIMITEDS.setdefault(instance, []).append(
-                LimitWrapper(limit_value, key_function, scope, per_method=per_method,
+                limitwrapper.LimitWrapper(limit_value, key_function, scope, per_method=per_method,
                              strategy=strategy, message=message, hit_func=hit_func)
             )
             return instance
@@ -44,7 +44,7 @@ def limit(limit_value, key_function=None, scope=None, per_method=True, strategy=
 
 def limit_exempt(fn):
     """
-    标识一个函数不受限与调用频率限制.
+    标识一个controller不受限与调用频率限制(当有全局limit时).
     """
 
     @functools.wraps(fn)
