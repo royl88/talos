@@ -19,6 +19,7 @@ from talos.common.limitwrapper import LimitWrapper
 from talos.core import config
 from talos.core import exceptions
 from talos.core.i18n import _
+import functools
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -56,13 +57,15 @@ class Limiter(object):
     装饰器通过管理映射关系表LIMITEDS，LIMITED_EXEMPT来定位用户设置的类实例->频率限制器关系，
     频率限制器是实力级别的，意味着每个实例都使用自己的频率限制器
 
-    频率限制器有5个主要参数：频率设置，关键限制参数，限制范围，是否对独立方法进行不同限制，错误提示信息
+    频率限制器有7个主要参数：频率设置，关键限制参数，限制范围，是否对独立方法进行不同限制, 算法，错误提示信息, hit函数
 
     - 频率设置：格式[count] [per|/] [n (optional)] [second|minute|hour|day|month|year]
     - 关键限制参数：默认为IP地址(支持X-Forwarded-For)，自定义函数：def key_func(request) -> string
     - 限制范围：默认python类完整路径，自定义函数def scope_func(request) -> string
     - 是否对独立方法进行不同限制: 布尔值，默认True
+    - 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
     - 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
+    - hit函数：函数定义为def hit(resource, request) -> bool，为True时则触发频率限制器hit，否则忽略
 
     PS：真正的频率限制范围 = 关键限制参数(默认IP地址) + 限制范围(默认python类完整路径) + 方法名(如果区分独立方法)，
     当此频率范围被命中后才会触发频率限制
@@ -74,6 +77,7 @@ class Limiter(object):
                  strategy=None,
                  storage_url=None,
                  per_method=None,
+                 key_func=None,
                  header_reset=None,
                  header_remaining=None,
                  header_limit=None):
@@ -84,14 +88,16 @@ class Limiter(object):
         if self.strategy not in STRATEGIES:
             raise ConfigurationError(_("invalid rate limiting strategy: %(strategy)s") % {'strategy': self.strategy})
         self.storage = storage_from_string(storage_url or CONF.rate_limit.storage_url)
-        self.limiter = STRATEGIES[self.strategy](self.storage)
-        self.key_function = get_ipaddr
+        self.limiters = {}
+        for strategy_name, strategy_class in STRATEGIES.items():
+            self.limiters[strategy_name] = strategy_class(self.storage)
+        self.key_function = get_ipaddr if key_func is None else key_func
         self.per_method = CONF.rate_limit.per_method if per_method is None else per_method
         self.global_limits = []
         if conf_limits:
             self.global_limits = [
                 LimitWrapper(
-                    list(parse_many(conf_limits)), self.key_function, None, self.per_method
+                    conf_limits, self.key_function, None, self.per_method
                 )
             ]
         self.header_mapping = {
@@ -101,10 +107,16 @@ class Limiter(object):
         }
         self.callback = callback
 
-    def __raise_exceeded(self, limit, hit_message=None):
+    def __raise_exceeded(self, limiter, limit, hit_message=None):
+        """
+        当到达频率限制时抛出异常
+        :param limiter: `RateLimiter` 对象（含存储、限制策略）
+        :param limit: (limit, key_func, scope)元组
+        :param hit_message: 自定义错误信息
+        """
         # 如果用户定义了错误消息，则直接使用消息内容
         if hit_message:
-            window_stats = self.limiter.get_window_stats(*limit)
+            window_stats = limiter.get_window_stats(*limit)
             hit_message = hit_message % {
                 'limit': limit[0].amount, 'remaining': window_stats[1], 'reset': int(window_stats[0] - time.time())}
             raise RateLimitExceeded(message=hit_message)
@@ -114,33 +126,45 @@ class Limiter(object):
         limiter_key = resource
         if limiter_key and inspect.ismethod(limiter_key):
             limiter_key = limiter_key.__func__
-        limiter_name = resource.__module__ + "." + resource.__class__.__name__ + ":on_" + request.method
-        limiter_name = limiter_name.lower()
+        resource_name = resource.__module__ + "." + resource.__class__.__name__ + ":on_" + request.method
+        resource_name = resource_name.lower()
         limits = self.global_limits
         if limiter_key is None or not self.enabled or limiter_key in LIMITED_EXEMPT:
             return
         if limiter_key in LIMITEDS:
             limits = LIMITEDS[limiter_key]
         limit_for_header = None
-        failed_limit = False
+        limiter_for_header = None
+        limit_reach = False
         failed_message = None
         for lim in limits:
+            limiter_for_header = self.limiters[lim.strategy or self.strategy]
             limit_scope = lim.get_scope(resource, request)
             cur_limits = lim.get_limits(resource, request)
-            failed_message = lim.get_message()
+            failed_message = lim.message
             for cur_limit in cur_limits:
                 if not limit_for_header or cur_limit < limit_for_header[0]:
                     limit_for_header = (cur_limit, (lim.key_func or self.key_function)(request), limit_scope)
-                if not self.limiter.hit(cur_limit, (lim.key_func or self.key_function)(request), limit_scope):
-                    LOG.warning("rate limit exceeded for %s (%s)", limiter_name, cur_limit)
-                    failed_limit = True
+                makehit = functools.partial(limiter_for_header.hit, cur_limit,
+                                            (lim.key_func or self.key_function)(request), limit_scope)
+                hit_result = True
+                if lim.hit_func:
+                    if lim.hit_func(resource, request):
+                        hit_result = makehit()
+                else:
+                    hit_result = makehit()
+
+                if not hit_result:
+                    LOG.warning("rate limit exceeded for %s (%s)", resource_name, cur_limit)
+                    limit_reach = True
                     limit_for_header = (cur_limit, (lim.key_func or self.key_function)(request), limit_scope)
                     break
-            if failed_limit:
+            if limit_reach:
                 break
+        request.x_rate_limiter = limiter_for_header
         request.x_rate_limit = limit_for_header
-        if failed_limit:
-            return self.callback(limit_for_header, failed_message)
+        if limit_reach:
+            return self.callback(limiter_for_header, limit_for_header, failed_message)
 
     def process_response(self, request, response, resource):
         """
@@ -148,9 +172,10 @@ class Limiter(object):
         :param response:
         :return:
         """
+        current_limiter = getattr(request, "x_rate_limiter", None)
         current_limit = getattr(request, "x_rate_limit", None)
         if self.enabled and current_limit:
-            window_stats = self.limiter.get_window_stats(*current_limit)
+            window_stats = current_limiter.get_window_stats(*current_limit)
             response.set_header(self.header_mapping['header_limit'], current_limit[0].amount)
             response.set_header(self.header_mapping['header_remaining'], window_stats[1])
             response.set_header(self.header_mapping['header_reset'], int(window_stats[0] - time.time()))
