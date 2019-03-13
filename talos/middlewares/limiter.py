@@ -46,6 +46,26 @@ class RateLimitExceeded(exceptions.Error):
 
 class Limiter(object):
     """
+    Limiter是基础falcon提供频率限制中间件
+
+    基本使用步骤：
+
+    - 在controller上配置装饰器
+    - 将Limiter配置到启动中间件
+
+    装饰器通过管理映射关系表LIMITEDS，LIMITED_EXEMPT来定位用户设置的类实例->频率限制器关系，
+    频率限制器是实力级别的，意味着每个实例都使用自己的频率限制器
+
+    频率限制器有5个主要参数：频率设置，关键限制参数，限制范围，是否对独立方法进行不同限制，错误提示信息
+
+    - 频率设置：格式[count] [per|/] [n (optional)] [second|minute|hour|day|month|year]
+    - 关键限制参数：默认为IP地址(支持X-Forwarded-For)，自定义函数：def key_func(request) -> string
+    - 限制范围：默认python类完整路径，自定义函数def scope_func(request) -> string
+    - 是否对独立方法进行不同限制: 布尔值，默认True
+    - 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
+
+    PS：真正的频率限制范围 = 关键限制参数(默认IP地址) + 限制范围(默认python类完整路径) + 方法名(如果区分独立方法)，
+    当此频率范围被命中后才会触发频率限制
     """
 
     def __init__(self,

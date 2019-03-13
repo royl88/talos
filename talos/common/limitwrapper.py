@@ -11,10 +11,10 @@ from limits.util import parse_many
 
 class LimitWrapper(object):
     """
-    封装调用频率限制所需的上下文
+    封装调用频率限制所需的上下文，详细介绍见limiter中间件
     """
 
-    def __init__(self, limits, key_func, scope, per_method=True, msg_fmt=None):
+    def __init__(self, limits, key_func, scope, per_method, msg_fmt=None):
         self._limits = limits
         self._scope = scope
         self.per_method = per_method
@@ -22,7 +22,7 @@ class LimitWrapper(object):
         self.msg_fmt = msg_fmt
 
     def get_limits(self, resource, request):
-        return list(parse_many(self._limits(request))) if callable(self._limits) else self._limits
+        return list(parse_many(self._limits(request))) if callable(self._limits) else list(parse_many(self._limits))
 
     def get_scope(self, resource, request):
         scope = (
