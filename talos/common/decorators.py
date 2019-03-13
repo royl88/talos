@@ -21,7 +21,7 @@ def limit(limit_value, key_function=None, scope=None, per_method=True, msg_fmt=N
     :param limit_value: limits的调用频率字符串或一个能返回限制器的函数.
     :param function key_func: 一个返回唯一标识字符串的函数，用于标识一个limiter,比如远端IP.
     :param function scope: 调用频率限制范围的命名空间.
-    :param msg_fmt: 错误提示信息可接受3个格式化内容.
+    :param msg_fmt: 错误提示信息可接受3个格式化（limit，remaining，reset）内容.
     """
 
     def _inner(fn):
@@ -29,15 +29,9 @@ def limit(limit_value, key_function=None, scope=None, per_method=True, msg_fmt=N
         @functools.wraps(fn)
         def __inner(*args, **kwargs):
             instance = fn(*args, **kwargs)
-            if callable(limit_value):
-                LIMITEDS.setdefault(instance, []).append(
-                    LimitWrapper(limit_value, key_function, scope, per_method=per_method, msg_fmt=msg_fmt)
-                )
-            else:
-                LIMITEDS.setdefault(instance, []).append(
-                    LimitWrapper(list(parse_many(limit_value)), key_function,
-                                 scope, per_method=per_method, msg_fmt=msg_fmt)
-                )
+            LIMITEDS.setdefault(instance, []).append(
+                LimitWrapper(limit_value, key_function, scope, per_method=per_method, msg_fmt=msg_fmt)
+            )
             return instance
 
         return __inner
