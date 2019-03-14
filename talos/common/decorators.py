@@ -12,7 +12,7 @@ from limits.util import parse_many
 from talos.common import limitwrapper
 
 LIMITEDS = {}
-LIMITED_EXEMPT = {}
+LIMITEDS_EXEMPT = {}
 
 
 def limit(limit_value, key_function=None, scope=None, per_method=True, strategy=None, message=None, hit_func=None):
@@ -33,7 +33,7 @@ def limit(limit_value, key_function=None, scope=None, per_method=True, strategy=
             instance = fn(*args, **kwargs)
             LIMITEDS.setdefault(instance, []).append(
                 limitwrapper.LimitWrapper(limit_value, key_function, scope, per_method=per_method,
-                             strategy=strategy, message=message, hit_func=hit_func)
+                                          strategy=strategy, message=message, hit_func=hit_func)
             )
             return instance
 
@@ -50,7 +50,7 @@ def limit_exempt(fn):
     @functools.wraps(fn)
     def __inner(*args, **kwargs):
         instance = fn(*args, **kwargs)
-        LIMITED_EXEMPT[instance] = None
+        LIMITEDS_EXEMPT[instance] = None
         return instance
 
     return __inner
