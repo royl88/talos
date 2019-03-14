@@ -62,7 +62,7 @@ def limit_exempt(fn):
     return __inner
 
 
-def flimit(limit_value, scope, key_func=None, strategy='fixed-window', message=None, hit_func=None, storage=None, delay=False):
+def flimit(limit_value, scope=None, key_func=None, strategy='fixed-window', message=None, storage=None, hit_func=None, delay_hit=False):
     """
     用于装饰一个函数、类函数表示其受限于此调用频率
     :param limit_value: limits的调用频率字符串或一个能返回限制器的函数.
@@ -106,15 +106,17 @@ def flimit(limit_value, scope, key_func=None, strategy='fixed-window', message=N
                             raise limitwrapper.RateLimitExceeded(limit=cur_limit)
 
             if __inner in FLIMITEDS:
-                if not delay:
+                if not delay_hit:
                     _test_limit(None)
                 result = fn(*args, **kwargs)
-                if delay:
+                if delay_hit:
                     _test_limit(result)
+                    
             else:
                 result = fn(*args, **kwargs)
             return result
 
+        scope = scope or (fn.__module__ + '.' + fn.__class__.__name__ + ':' + fn.__name__)
         # 处理重复的装饰器
         # @flimit(...)
         # @flimit(...)
