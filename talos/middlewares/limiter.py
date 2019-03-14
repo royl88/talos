@@ -13,7 +13,7 @@ from limits.errors import ConfigurationError
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES
 
-from talos.common.decorators import LIMITEDS, LIMITED_EXEMPT
+from talos.common.decorators import LIMITEDS, LIMITEDS_EXEMPT
 from talos.common import limitwrapper
 from talos.core import config
 from talos.core.i18n import _
@@ -36,7 +36,7 @@ class Limiter(object):
     - 在controller上配置装饰器
     - 将Limiter配置到启动中间件
 
-    装饰器通过管理映射关系表LIMITEDS，LIMITED_EXEMPT来定位用户设置的类实例->频率限制器关系，
+    装饰器通过管理映射关系表LIMITEDS，LIMITEDS_EXEMPT来定位用户设置的类实例->频率限制器关系，
     频率限制器是实力级别的，意味着每个实例都使用自己的频率限制器
 
     频率限制器有7个主要参数：频率设置，关键限制参数，限制范围，是否对独立方法进行不同限制, 算法，错误提示信息, hit函数
@@ -111,7 +111,7 @@ class Limiter(object):
         resource_name = resource.__module__ + "." + resource.__class__.__name__ + ":on_" + request.method
         resource_name = resource_name.lower()
         limits = self.global_limits
-        if limiter_key is None or not self.enabled or limiter_key in LIMITED_EXEMPT:
+        if limiter_key is None or not self.enabled or limiter_key in LIMITEDS_EXEMPT:
             return
         if limiter_key in LIMITEDS:
             limits = LIMITEDS[limiter_key]
