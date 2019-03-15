@@ -18,7 +18,7 @@ def singleton(cls):
 
     def _singleton(*args, **kwargs):
         with lock:
-            fullkey = str((cls.__name__, tuple(args), tuple(kwargs.items())))
+            fullkey = str((cls.__module__, cls.__name__, tuple(args), tuple(kwargs.items())))
             if fullkey not in instances:
                 instances[fullkey] = cls(*args, **kwargs)
         return instances[fullkey]
@@ -35,6 +35,7 @@ def require(mod_name, attr_name):
     '''
 
     class _lazy_attribute(object):
+
         def __init__(self, mod_name):
             mods = mod_name.split(':')
             self.mod_name = mods[0]
@@ -49,9 +50,12 @@ def require(mod_name, attr_name):
             return mod
 
     def _require_api(cls):
+
         def __require_api(*args, **kwargs):
             setattr(cls, attr_name, _lazy_attribute(mod_name))
             instance = cls(*args, **kwargs)
             return instance
+
         return __require_api
+
     return _require_api
