@@ -332,6 +332,7 @@ class ResourceBase(object):
             'float': filter_wrapper.FilterNumber(),
             'date': filter_wrapper.FilterDateTime(),
             'datetime': filter_wrapper.FilterDateTime(),
+            'boolean': filter_wrapper.FilterBool()
         }
         return handlers
     

@@ -411,6 +411,63 @@ class FilterNumber(Filter):
 
     def op_iends(self, column, value):
         return None
+    
+    
+class FilterBool(Filter):
+    '''
+    布尔类型
+    '''
+
+    def op(self, column, value):
+        if utils.is_list_type(value):
+            expr = None
+        else:
+            if isinstance(column, BinaryExpression):
+                column = cast(column, value)
+            expr = column.is_(utils.bool_from_string(value))
+        return expr
+    
+    def op_eq(self, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        expr = column.is_(utils.bool_from_string(value))
+        return expr
+
+    def op_ne(self, column, value):
+        if isinstance(column, BinaryExpression):
+            column = cast(column, value)
+        expr = column.isnot(utils.bool_from_string(value))
+        return expr
+    
+    def op_in(self, column, value):
+        return None
+    
+    def op_nin(self, column, value):
+        return None
+
+    def op_like(self, column, value):
+        return None
+    
+    def op_nlike(self, column, value):
+        return None
+
+    def op_starts(self, column, value):
+        return None
+
+    def op_ends(self, column, value):
+        return None
+
+    def op_ilike(self, column, value):
+        return None
+    
+    def op_nilike(self, column, value):
+        return None
+
+    def op_istarts(self, column, value):
+        return None
+
+    def op_iends(self, column, value):
+        return None
 
 
 FilterDateTime = FilterNumber
