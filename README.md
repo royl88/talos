@@ -277,7 +277,7 @@ id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
 
 | 过滤条件 | 值类型          | 含义                                                           |
 | -------- | --------------- | -------------------------------------------------------------- |
-| like      | string         | 模糊查询，包含条件                                             |
+| like      | string         | 模糊查询，包含条件                                          |
 | ilike     | string         | 同上，不区分大小写                                             |
 | starts    | string         | 模糊查询，以xxxx开头                                           |
 | istarts   | string         | 同上，不区分大小写                                             |
@@ -296,7 +296,9 @@ id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
 | null      | 任意           | 是NULL，等同于{'eq': None}，null主要提供HTTP API中使用                   |
 | nnull     | 任意           | 不是NULL，等同于{'ne': None}，nnull主要提供HTTP API中使用                  |
 
+过滤条件可以根据不同的数据类型生成不同的查询语句，varchar类型的in是 IN ('1', '2') , inet类型的in是<<=cidr
 
+一般类型的eq是col='value'，bool类型的eq是col is TRUE，详见talos.db.filter_wrapper
 
 #### 业务api控制类
 
@@ -1012,29 +1014,50 @@ def test(arg):
 
 #### 频率限制
 
-独立中间件版见：[falcon_limit](https://github.com/royl88/falcon_limit) , 使用方法完全相同
+##### controller & 中间件 频率限制
 
-* 定义Controller
+主要用于http接口频率限制
 
-* 使用装饰器装饰要进行rate limit的函数，必须是on\_method的函数
+    基本使用步骤：
+    
+    - 在controller上配置装饰器
+    - 将Limiter配置到启动中间件
+    
+    装饰器通过管理映射关系表LIMITEDS，LIMITEDS_EXEMPT来定位用户设置的类实例->频率限制器关系，
+    频率限制器是实力级别的，意味着每个实例都使用自己的频率限制器
+    
+    频率限制器有7个主要参数：频率设置，关键限制参数，限制范围，是否对独立方法进行不同限制, 算法，错误提示信息, hit函数
+    
+    - 频率设置：格式[count] [per|/] [n (optional)] [second|minute|hour|day|month|year]
+    - 关键限制参数：默认为IP地址(支持X-Forwarded-For)，自定义函数：def key_func(request) -> string
+    - 限制范围：默认python类完整路径，自定义函数def scope_func(request) -> string
+    - 是否对独立方法进行不同限制: 布尔值，默认True
+    - 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
+    - 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
+    - hit函数：函数定义为def hit(resource, request) -> bool，为True时则触发频率限制器hit，否则忽略
+    
+> PS：真正的频率限制范围 = 关键限制参数(默认IP地址) + 限制范围(默认python类完整路径) + 方法名(如果区分独立方法)，当此频率范围被命中后才会触发频率限制
 
-* 启用中间件
 
-##### 静态频率限制(配置/代码)
 
-**函数级的频率限制**
+
+
+###### 静态频率限制(配置/代码)
+
+**controller级的频率限制**
 
 ```python
 # coding=utf-8
 
 import falcon
-from talos.common import decorators
+from talos.common import decorators as deco
 from talos.common import limitwrapper
 
 # 快速自定义一个简单支持GET、POST请求的Controller
 # add_route('/things', ThingsController())
+
+@deco.limit('1/second')
 class ThingsController(object):
-    @deco.limit('1/second')
     def on_get(self, req, resp):
         """Handles GET requests, using 1/second limit"""
         resp.body = ('It works!')
@@ -1043,7 +1066,7 @@ class ThingsController(object):
         resp.body = ('It works!')
 ```
 
-**中间件全局级的频率限制**
+###### 全局级的频率限制
 
 ```json
 {
@@ -1060,7 +1083,7 @@ class ThingsController(object):
 }
 ```
 
-##### 动态频率限制
+###### 基于中间件动态频率限制
 
 以上的频率限制都是预定义的，无法根据具体参数进行动态的更改，而通过重写中间件的get_extra_limits函数，我们可以获得动态追加频率限制的能力
 
@@ -1087,7 +1110,32 @@ application = base.initialize_server('cms',
                                      override_middlewares=True)
 ```
 
+##### 函数级频率限制
 
+```python
+from talos.common import decorators as deco
+
+@deco.limit('1/second')
+def test():
+    pass
+```
+
+
+
+    用于装饰一个函数、类函数表示其受限于此调用频率
+    当装饰类成员函数时，频率限制范围是类级别的，意味着类的不同实例共享相同的频率限制，
+    如果需要实例级隔离的频率限制，需要手动指定key_func，并使用返回实例标识作为限制参数
+    
+    :param limit_value: 频率设置：格式[count] [per|/] [n (optional)][second|minute|hour|day|month|year]
+    :param scope: 限制范围空间：默认python类/函数完整路径.
+    :param key_func: 关键限制参数：默认为空字符串，自定义函数：def key_func(*args, **kwargs) -> string
+    :param strategy: 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
+    :param message: 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
+    :param storage: 频率限制后端存储数据，如: memory://, redis://:pass@localhost:6379
+    :param hit_func: 函数定义为def hit(result) -> bool，为True时则触发频率限制器hit，否则忽略
+    :param delay_hit: 默认在函数执行前测试频率hit，可以设置为True将频率测试hit放置在函数执行后，搭配hit_func
+                       使用，可以获取到函数执行结果来控制是否执行hit
+关于函数频率限制模块更多用例，请见单元测试tests.test_limit_func
 
 #### 数据库版本管理
 
