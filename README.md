@@ -428,30 +428,32 @@ Host: 127.0.0.1:9002
      name__in[0]=a&name__in[1]=b&name__in[2]=c
      ```
 
-     严格模式(CONF.strict_criteria_transform=True)仅支持全拼条件，CONF.strict_criteria_transform=False(默认)时同时支持全拼条件和缩写条件查询：
+     同时支持全拼条件和缩写条件查询：
 
 
-| 全拼条件     | 缩写条件  | 含义                                                           |
-| ------------ | --------- | -------------------------------------------------------------- |
-| N/A          |           | 精确查询，完全等于条件，如果多个此条件出现，则认为条件在列表中 |
-| contains     | like      | 模糊查询，包含条件                                             |
-| icontains    | ilike     | 同上，不区分大小写                                             |
-| startswith   | starts    | 模糊查询，以xxxx开头                                           |
-| istartswith  | istarts   | 同上，不区分大小写                                             |
-| endswith     | ends      | 模糊查询，以xxxx结尾                                           |
-| iendswith    | iends     | 同上，不区分大小写                                             |
-| in           | in        | 精确查询，条件在列表中                                         |
-| notin        | nin       | 精确查询，条件不在列表中                                       |
-| equal        | eq        | 等于                                                           |
-| notequal     | ne        | 不等于                                                         |
-| less         | lt        | 小于                                                           |
-| lessequal    | lte       | 小于等于                                                       |
-| greater      | gt        | 大于                                                           |
-| greaterequal | gte       | 大于等于                                                       |
-| excludes     | nlike     | 模糊查询，不包含                                               |
-| iexcludes    | nilike    | 同上，不区分大小写                                             |
-| null         | null      | 是NULL                                                         |
-| notnull      | nnull     | 不是NULL                                                       |
+| 全拼条件     | 缩写条件 | 含义                                                         |
+| ------------ | -------- | ------------------------------------------------------------ |
+| N/A          |          | 精确查询，完全等于条件，如果多个此条件出现，则认为条件在列表中 |
+| contains     | like     | 模糊查询，包含条件                                           |
+| icontains    | ilike    | 同上，不区分大小写                                           |
+| startswith   | starts   | 模糊查询，以xxxx开头                                         |
+| istartswith  | istarts  | 同上，不区分大小写                                           |
+| endswith     | ends     | 模糊查询，以xxxx结尾                                         |
+| iendswith    | iends    | 同上，不区分大小写                                           |
+| in           | in       | 精确查询，条件在列表中                                       |
+| notin        | nin      | 精确查询，条件不在列表中                                     |
+| equal        | eq       | 等于                                                         |
+| notequal     | ne       | 不等于                                                       |
+| less         | lt       | 小于                                                         |
+| lessequal    | lte      | 小于等于                                                     |
+| greater      | gt       | 大于                                                         |
+| greaterequal | gte      | 大于等于                                                     |
+| excludes     | nlike    | 模糊查询，不包含                                             |
+| iexcludes    | nilike   | 同上，不区分大小写                                           |
+| null         | null     | 是NULL                                                       |
+| notnull      | nnull    | 不是NULL                                                     |
+| hasany       | hasany   | *JSONB专用*   包含任意key，如['a','b', 'c'] hasany ['a','d'] |
+| hasall       | hasall   | *JSONB专用*   包含所有key，如['a','b', 'c'] hasall ['a','c'] |
 
 
 
@@ -1035,7 +1037,7 @@ def test(arg):
     - 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
     - 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
     - hit函数：函数定义为def hit(resource, request) -> bool，为True时则触发频率限制器hit，否则忽略
-    
+
 > PS：真正的频率限制范围 = 关键限制参数(默认IP地址) + 限制范围(默认python类完整路径) + 方法名(如果区分独立方法)，当此频率范围被命中后才会触发频率限制
 
 
@@ -1322,7 +1324,6 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | controller.criteria_key.limit          | string | controller接受用户的limit参数的关键key值                     | __limit                                                      |
 | controller.criteria_key.orders         | string | controller接受用户的orders参数的关键key值                    | __orders                                                     |
 | controller.criteria_key.fields         | string | controller接受用户的fields参数的关键key值                    | __fields                                                     |
-| strict_criteria_transform              | bool   | 是否使用严格查询条件模式，如果True，则表示仅支持greater类查询，False则同时支持greater，gt类查询 | Flase                                                        |
 | override_defalut_middlewares           | bool   | 覆盖系统默认加载的中间件                                     | Flase                                                        |
 | server                                 | dict   | 服务监听配置项                                               |                                                              |
 | server.bind                            | string | 监听地址                                                     | 0.0.0.0                                                      |

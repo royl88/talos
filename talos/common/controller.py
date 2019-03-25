@@ -93,6 +93,7 @@ class Controller(object):
             else:
                 strip_query_dict[key] = value
         query_dict = strip_query_dict
+        # NOTE(wujj): filter_mapping仅用于前向兼容v1.2.2
         filter_mapping = {'contains': 'like', 'icontains': 'ilike',  # include
                           'istartswith': 'istarts', 'startswith': 'starts',  # starts with
                           'iendswith': 'iends', 'endswith': 'ends',  # ends with

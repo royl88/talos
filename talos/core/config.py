@@ -184,7 +184,6 @@ CONFIG_OPTS = {
     'locale_app': UNSET,
     'locale_path': UNSET,
     'override_defalut_middlewares': False,
-    'strict_criteria_transform': False,
     'server': {
         'bind': '127.0.0.1',
         'port': 9001,
