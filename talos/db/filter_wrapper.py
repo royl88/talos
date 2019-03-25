@@ -10,12 +10,16 @@ talos.db.filter_wrapper
 from __future__ import absolute_import
 
 import re
+from collections import Mapping
 
+from sqlalchemy import Text
+from sqlalchemy import cast as sqlcast
 from sqlalchemy.orm import attributes
 from sqlalchemy.orm import properties
 from sqlalchemy.orm import relationships
 from sqlalchemy.sql.expression import BinaryExpression
 from sqlalchemy.sql.sqltypes import _type_map
+from sqlalchemy.dialects.postgresql import array, ARRAY, JSONB
 
 from talos.core import utils
 
@@ -265,11 +269,11 @@ class Filter(NullFilter):
         return expr
     
     def op_nnull(self, column, value):
-        expr = column != None
+        expr = column.isnot(None)
         return expr
     
     def op_null(self, column, value):
-        expr = column == None
+        expr = column.is_(None)
         return expr
 
 
@@ -484,26 +488,32 @@ class FilterJSON(Filter):
     JSON/JSONB类型
     '''
 
-    def op_has(self, column, value):
+    def op_hasall(self, column, value):
         if utils.is_list_type(value):
-            if isinstance(column, BinaryExpression):
-                column = cast(column, value[0])
-            expr = column.op('?&')(tuple(value))
+            expr = column.op('?&')(sqlcast(array(value), ARRAY(Text)))
         else:
-            if isinstance(column, BinaryExpression):
-                column = cast(column, value)
             expr = column.op('?')(value)
         return expr
     
     def op_hasany(self, column, value):
         if utils.is_list_type(value):
-            if isinstance(column, BinaryExpression):
-                column = cast(column, value[0])
-            expr = column.op('?|')(tuple(value))
+            expr = column.op('?|')(sqlcast(array(value), ARRAY(Text)))
         else:
-            if isinstance(column, BinaryExpression):
-                column = cast(column, value)
-            expr = column.op('?|')((value,))
+            expr = column.op('?')(value)
+        return expr
+    
+    def op_in(self, column, value):
+        if isinstance(value, Mapping):
+            expr = column.op('@>')(sqlcast(value, JSONB))
+        else:
+            expr = None
+        return expr
+    
+    def op_nin(self, column, value):
+        if isinstance(value, Mapping):
+            expr = ~column.op('@>')(sqlcast(value, JSONB))
+        else:
+            expr = None
         return expr
 
 
