@@ -79,7 +79,70 @@ def cast(column, value):
     return column
 
 
-class Filter(object):
+class NullFilter(object):
+
+    def make_empty_query(self, column):
+        return column.is_(None) & column.isnot(None)
+
+    def op(self, column, value):
+        pass
+
+    def op_in(self, column, value):
+        pass
+
+    def op_nin(self, column, value):
+        pass
+
+    def op_eq(self, column, value):
+        pass
+
+    def op_ne(self, column, value):
+        pass
+
+    def op_lt(self, column, value):
+        pass
+
+    def op_lte(self, column, value):
+        pass
+
+    def op_gt(self, column, value):
+        pass
+
+    def op_gte(self, column, value):
+        pass
+
+    def op_like(self, column, value):
+        pass
+
+    def op_starts(self, column, value):
+        pass
+
+    def op_ends(self, column, value):
+        pass
+    
+    def op_nlike(self, column, value):
+        pass
+
+    def op_ilike(self, column, value):
+        pass
+
+    def op_istarts(self, column, value):
+        pass
+
+    def op_iends(self, column, value):
+        pass
+    
+    def op_nilike(self, column, value):
+        pass
+    
+    def op_nnull(self, column, value):
+        pass
+    
+    def op_null(self, column, value):
+        pass
+
+
+class Filter(NullFilter):
 
     def make_empty_query(self, column):
         return column == None & column != None
@@ -210,7 +273,7 @@ class Filter(object):
         return expr
 
 
-class FilterNetwork(Filter):
+class FilterNetwork(NullFilter):
     '''
     用于PG数据库， 重写IP，CIDR的范围查询，不支持like操作
     '''
@@ -322,30 +385,6 @@ class FilterNetwork(Filter):
             expr = ~column.op("<<=")(value)
         return expr
 
-    def op_like(self, column, value):
-        return None
-    
-    def op_nlike(self, column, value):
-        return None
-
-    def op_starts(self, column, value):
-        return None
-
-    def op_ends(self, column, value):
-        return None
-
-    def op_ilike(self, column, value):
-        return None
-    
-    def op_nilike(self, column, value):
-        return None
-
-    def op_istarts(self, column, value):
-        return None
-
-    def op_iends(self, column, value):
-        return None
-
     def op_lt(self, column, value):
         value = self.validate_cidr(value)
         if not value:
@@ -389,31 +428,31 @@ class FilterNumber(Filter):
     '''
 
     def op_like(self, column, value):
-        return None
+        pass
     
     def op_nlike(self, column, value):
-        return None
+        pass
 
     def op_starts(self, column, value):
-        return None
+        pass
 
     def op_ends(self, column, value):
-        return None
+        pass
 
     def op_ilike(self, column, value):
-        return None
+        pass
     
     def op_nilike(self, column, value):
-        return None
+        pass
 
     def op_istarts(self, column, value):
-        return None
+        pass
 
     def op_iends(self, column, value):
-        return None
+        pass
     
     
-class FilterBool(Filter):
+class FilterBool(NullFilter):
     '''
     布尔类型
     '''
@@ -438,36 +477,34 @@ class FilterBool(Filter):
             column = cast(column, value)
         expr = column.isnot(utils.bool_from_string(value))
         return expr
+
+
+class FilterJSON(Filter):
+    '''
+    JSON/JSONB类型
+    '''
+
+    def op_has(self, column, value):
+        if utils.is_list_type(value):
+            if isinstance(column, BinaryExpression):
+                column = cast(column, value[0])
+            expr = column.op('?&')(tuple(value))
+        else:
+            if isinstance(column, BinaryExpression):
+                column = cast(column, value)
+            expr = column.op('?')(value)
+        return expr
     
-    def op_in(self, column, value):
-        return None
-    
-    def op_nin(self, column, value):
-        return None
-
-    def op_like(self, column, value):
-        return None
-    
-    def op_nlike(self, column, value):
-        return None
-
-    def op_starts(self, column, value):
-        return None
-
-    def op_ends(self, column, value):
-        return None
-
-    def op_ilike(self, column, value):
-        return None
-    
-    def op_nilike(self, column, value):
-        return None
-
-    def op_istarts(self, column, value):
-        return None
-
-    def op_iends(self, column, value):
-        return None
+    def op_hasany(self, column, value):
+        if utils.is_list_type(value):
+            if isinstance(column, BinaryExpression):
+                column = cast(column, value[0])
+            expr = column.op('?|')(tuple(value))
+        else:
+            if isinstance(column, BinaryExpression):
+                column = cast(column, value)
+            expr = column.op('?|')((value,))
+        return expr
 
 
 FilterDateTime = FilterNumber
