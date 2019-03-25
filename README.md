@@ -454,6 +454,10 @@ Host: 127.0.0.1:9002
 | notnull      | nnull    | 不是NULL                                                     |
 | hasany       | hasany   | *JSONB专用*   包含任意key，如['a','b', 'c'] hasany ['a','d'] |
 | hasall       | hasall   | *JSONB专用*   包含所有key，如['a','b', 'c'] hasall ['a','c'] |
+| within       | within   | *JSONB专用*   被指定json包含在内                             |
+| nwithin      | nwithin  | *JSONB专用*   不被指定json包含在内                           |
+| include      | include  | *JSONB专用*   包含指定的json                                 |
+| ninclude     | ninclude | *JSONB专用*   不包含指定的json                               |
 
 
 
