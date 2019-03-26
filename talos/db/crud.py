@@ -12,7 +12,7 @@ import copy
 import logging
 
 import six
-from sqlalchemy import and_, or_
+from sqlalchemy import text, and_, or_
 import sqlalchemy.exc
 
 from talos.core import config
@@ -474,7 +474,7 @@ class ResourceBase(object):
                 query = query.filter(expr)
             for idx, error_filter in enumerate(unsupported):
                 name, op, value = error_filter
-                self._unsupported_filter(query, idx, name, op, value)
+                query = self._unsupported_filter(query, idx, name, op, value)
         orders = orders or []
         if orders:
             for field in orders:
@@ -509,6 +509,8 @@ class ResourceBase(object):
         :param value: 过滤值对象
         :type value: str/list/dict
         '''
+        # FIXME(wujj): 伪造一个必定为空的查询
+        query = query.filter(text('1!=1'))
         return query
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
