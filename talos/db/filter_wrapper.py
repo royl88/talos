@@ -503,28 +503,28 @@ class FilterJSON(Filter):
         return expr
     
     def op_within(self, column, value):
-        if isinstance(value, Mapping):
+        if isinstance(value, (Mapping, list, tuple)):
             expr = column.op('<@')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
     
     def op_nwithin(self, column, value):
-        if isinstance(value, Mapping):
+        if isinstance(value, (Mapping, list, tuple)):
             expr = ~column.op('<@')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
     
     def op_include(self, column, value):
-        if isinstance(value, Mapping):
+        if isinstance(value, (Mapping, list, tuple)):
             expr = column.op('@>')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
     
     def op_ninclude(self, column, value):
-        if isinstance(value, Mapping):
+        if isinstance(value, (Mapping, list, tuple)):
             expr = ~column.op('@>')(sqlcast(value, JSONB))
         else:
             expr = None
