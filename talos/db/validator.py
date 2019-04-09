@@ -158,7 +158,7 @@ class InValidator(NullValidator):
     """列表内容(在)范围型验证器"""
 
     def __init__(self, choices):
-        self._choices = set(choices)
+        self._choices = choices
 
     def validate(self, value):
         if value in self._choices:
@@ -170,7 +170,7 @@ class NotInValidator(NullValidator):
     """列表内容(不在)范围型验证器"""
 
     def __init__(self, choices):
-        self._choices = set(choices)
+        self._choices = choices
 
     def validate(self, value):
         if value not in self._choices:
@@ -191,4 +191,3 @@ class ChainValidator(NullValidator):
             if result is not True:
                 return result
         return True
-    
