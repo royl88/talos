@@ -336,7 +336,7 @@ class ResourceBase(object):
             'jsonb': filter_wrapper.FilterJSON(),
         }
         return handlers
-    
+
     def _filter_key_mapping(self):
         keys = {
             '$or': or_,
@@ -360,7 +360,7 @@ class ResourceBase(object):
             if col_type:
                 return getattr(col_type, '__visit_name__', None)
             return None
-        
+
         def _handle_filter(expr_wrapper, handler, op, column, value):
             '''
             将具体列+操作+值转化为SQL表达式（SQLAlchmey表达式）
@@ -387,7 +387,7 @@ class ResourceBase(object):
                     if expr_wrapper:
                         expr = expr_wrapper(expr)
             return expr
-        
+
         def _get_expression(filters):
             '''
             将所有filters转换为表达式
@@ -405,7 +405,7 @@ class ResourceBase(object):
                 if expr is not None:
                     expressions.append(expr)
             return unsupported, expressions
-        
+
         def _get_key_expression(name, value):
             '''
             将$and, $or类的组合过滤转换为表达式
@@ -429,7 +429,7 @@ class ResourceBase(object):
                 return unsupported, expressions[0]
             else:
                 return unsupported, key_wrapper(*expressions)
-        
+
         def _get_column_expression(name, value):
             '''
             将列+值过滤转换为表达式
@@ -493,14 +493,14 @@ class ResourceBase(object):
                     else:
                         query = query.order_by(column.desc())
         return query
-    
+
     def _unsupported_filter(self, query, idx, name, op, value):
         '''
         未默认受支持的过滤条件，因talos以前行为为忽略，因此默认返回query不做任何处理，
         此处可以修改并返回query对象更改默认行为
         :param query: SQL查询对象
         :type query: sqlalchemy.query
-        :param idx: 第N个不支持的过滤操作
+        :param idx: 第N个不支持的过滤操作(0~N-1)
         :type idx: int
         :param name: 过滤字段
         :type name: str
@@ -510,7 +510,8 @@ class ResourceBase(object):
         :type value: str/list/dict
         '''
         # FIXME(wujj): 伪造一个必定为空的查询
-        query = query.filter(text('1!=1'))
+        if idx == 0:
+            query = query.filter(text('1!=1'))
         return query
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
