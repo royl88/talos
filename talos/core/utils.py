@@ -144,9 +144,13 @@ def generate_uuid(dashed=False, version=1, lower=True):
     return guid.upper()
 
 
-def generate_prefix_uuid(prefix, length=8):
+def generate_prefix_uuid(prefix, length=16):
     """
-    创建一个带指定前缀的类uuid标识，碰撞概率偏大
+    创建一个带指定前缀的类有序uuid标识，最小长度8时，测试碰撞概率如下
+    Linux 3.10.0-693.17.1.el7.x86_64 
+    length=8 100w碰撞0
+    length=8 1000w碰撞0
+    length=8 1500w碰撞0
 
     :param prefix: 前缀
     :type prefix: string
@@ -155,7 +159,11 @@ def generate_prefix_uuid(prefix, length=8):
     :returns: UUID
     :rtype: string
     """
-    uid = prefix + uuid.uuid1().hex[:length]
+    if length < 8 or length > 40:
+        raise ValueError('8 <= length <= 40')
+    uuid1 = uuid.uuid1().hex
+    uuid4 = uuid.uuid4().hex
+    uid = ''.join([prefix, uuid1[:8], uuid4[:length - 8]])
     return uid
 
 
@@ -338,7 +346,7 @@ get_attr = get_config
 def get_item(data, expr, delimiter='.', default=None):
     '''
     使用a.[b].c表达式从dict中获取值
-    
+
     :param data:      数据
     :type data:       dict/list/tuple/set
     :param expr:      路径表达式，eg. log.path
