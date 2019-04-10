@@ -510,7 +510,7 @@ class ResourceBase(object):
         :type value: str/list/dict
         '''
         # FIXME(wujj): 伪造一个必定为空的查询
-        if idx == 0:
+        if idx == 0 and CONF.dbcrud.unsupported_filter_as_empty:
             query = query.filter(text('1!=1'))
         return query
 
