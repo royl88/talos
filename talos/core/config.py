@@ -215,6 +215,9 @@ CONFIG_OPTS = {
         # 'pool_timeout': 5,
         # 'max_overflow': 5,
     },
+    'dbcrud': {
+        'unsupported_filter_as_empty': False
+    },
     'cache': {
         'type': 'dogpile.cache.memory',
         'expiration_time': 60
