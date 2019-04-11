@@ -6,12 +6,14 @@ import random
 
 from talos.server import base
 from talos.db import crud
+from talos.core import config
 from talos.core import exceptions
 
 from tests import models
 
 base.initialize_server('test', './tests/unittest.conf')
 LOG = logging.getLogger(__name__)
+CONF = config.CONF
 
 
 class _Base(crud.ResourceBase):
@@ -110,12 +112,18 @@ def test_list_or_2():
 
 def test_list_or_3():
     users = _User().list(filters={'$or': [{'notexistscol': '1'}]})
-    assert len(users) == 0
+    if CONF.dbcrud.unsupported_filter_as_empty:
+        assert len(users) == 0
+    else:
+        assert len(users) > 1
 
 
 def test_list_or_4():
     users = _User().list(filters={'$or': [{'age': {'like': 3}}]})
-    assert len(users) == 0
+    if CONF.dbcrud.unsupported_filter_as_empty:
+        assert len(users) == 0
+    else:
+        assert len(users) > 1
 
 
 def test_list_and_1():
@@ -231,9 +239,17 @@ def test_default_filter():
 
 def test_unsupported_column():
     users = _UserWithFilter().list({'kagenomore': {'eq': 3, 'gt': 1}})
-    assert len(users) == 0
+    if CONF.dbcrud.unsupported_filter_as_empty:
+        assert len(users) == 0
+    else:
+        assert len(users) == 1
+        assert users[0]['id'] == '4'
 
 
 def test_unsupported_filter():
     users = _UserWithFilter().list({'age': {'ilike': '3'}})
-    assert len(users) == 0
+    if CONF.dbcrud.unsupported_filter_as_empty:
+        assert len(users) == 0
+    else:
+        assert len(users) == 1
+        assert users[0]['id'] == '4'
