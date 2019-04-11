@@ -1347,12 +1347,14 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | log.loggers.name                       | string | 模块名称路径，如cms.apps.test                                |                                                              |
 | log.loggers.level                      | string | 日志级别                                                     |                                                              |
 | log.loggers.path                       | string | 日志路径                                                     |                                                              |
-| db                                     | dict   | 数据库配置项                                                 |                                                              |
+| db                                     | dict   | 默认数据库配置项，用户可以自行定义其他DB配置项，但需要自己初始化DBPool对象(可以参考DefaultDBPool进行单例控制) |                                                              |
 | db.connection                          | string | 连接字符串                                                   |                                                              |
 | db.pool_size                           | int    | 连接池大小                                                   | 3                                                            |
 | db.pool_recycle                        | int    | 连接最大空闲时间，超过时间后自动回收                         | 3600                                                         |
 | db.pool_timeout                        | int    | 获取连接超时时间，单位秒                                     | 5                                                            |
 | db.max_overflow                        | int    | 突发连接池扩展大小                                           | 5                                                            |
+| dbcrud                                 | dict   | 数据库CRUD控制项                                             |                                                              |
+| dbcrud.unsupported_filter_as_empty     | bool   | 当遇到不支持的filter时的默认行为，1是返回空结果，2是忽略不支持的条件，由于历史版本的行为默认为2，因此其默认值为False，即忽略不支持的条件 | False                                                        |
 | cache                                  | dict   | 缓存配置项                                                   |                                                              |
 | cache.type                             | string | 缓存后端类型                                                 | dogpile.cache.memory                                         |
 | cache.expiration_time                  | int    | 缓存默认超时时间，单位为秒                                   | 3600                                                         |

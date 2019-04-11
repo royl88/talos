@@ -314,12 +314,10 @@ class ResourceBase(object):
     # converter，对象实例，converter中的类型，可以自定义
     _validate = []
 
-    def __init__(self, session=None, transaction=None):
-        self._pool = None
+    def __init__(self, session=None, transaction=None, dbpool=None):
+        self._pool = dbpool or pool.POOL
         self._session = session
         self._transaction = transaction
-        if session is None and transaction is None:
-            self._pool = pool.POOL
 
     def _filter_hander_mapping(self):
         handlers = {
