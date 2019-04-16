@@ -29,16 +29,18 @@
 
 from __future__ import absolute_import
 
+import contextlib
+
 from dogpile.cache import make_region
 from dogpile.cache.api import NO_VALUE
 from talos.core import config
 from talos.core import utils
 
-
 CONF = config.CONF
 
 
 class CacheProxy(object):
+
     def __init__(self):
         self.cache = None
 
@@ -100,3 +102,15 @@ def get_or_create(key, creator, expires=None):
 
 def delete(key):
     return CACHE.delete(key)
+
+
+@contextlib.contextmanager
+def distributed_lock(key):
+    lock = CACHE.backend.get_mutex(key)
+    try:
+        yield lock.acquire(True)
+    finally:
+        try:
+            lock.release()
+        except:
+            pass
