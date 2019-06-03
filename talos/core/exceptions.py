@@ -6,6 +6,10 @@
 
 from __future__ import absolute_import
 
+import json
+
+import dicttoxml
+from talos.core import utils
 from talos.core.i18n import _
 
 
@@ -13,12 +17,17 @@ class Error(Exception):
     """异常基类"""
     code = 500
 
-    def __init__(self, message=None, **kwargs):
-        if message:
+    def __init__(self, message=None, exception_data=None, **kwargs):
+        if message is not None:
             self.message = message
         else:
             self._build_message(**kwargs)
-        super(Error, self).__init__(self.message)
+        self._exception_data = exception_data or {}
+        # code,title,description为保留字段
+        self._exception_data.pop('code', None)
+        self._exception_data.pop('title', None)
+        self._exception_data.pop('description', None)
+        super(Error, self).__init__(self.message, self._exception_data)
 
     def _build_message(self, **kwargs):
         self.message = self.message_format % kwargs
@@ -33,6 +42,25 @@ class Error(Exception):
     @property
     def title(self):
         return None
+
+    @property
+    def exception_data(self):
+        return self._exception_data
+
+    def to_dict(self):
+        data = {'code': self.code, 'title': self.title, 'description': self.message}
+        exception_data = self._exception_data.copy()
+        if exception_data:
+            data.update(exception_data)
+        return data
+
+    def to_json(self):
+        data = self.to_dict()
+        return json.dumps(data, cls=utils.ComplexEncoder)
+
+    def to_xml(self):
+        data = self.to_dict()
+        return dicttoxml.dicttoxml(data, custom_root='error')
 
 
 class CallBackError(Error):
