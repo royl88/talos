@@ -65,9 +65,9 @@ def error_http_exception(ex, req, resp, params):
     if isinstance(ex, falcon.errors.HTTPError):
         code = int(ex.status.split(' ', 1)[0])
         title = ex.status.split(' ', 1)[1]
-        description = title
+        description = title if ex.description is None else ex.description
     elif isinstance(ex, exceptions.Error):
-        code = getattr(ex, 'code', 500)
+        code = ex.code
         title = ex.title
         description = ex.message
         exception_data = ex.exception_data
@@ -100,13 +100,16 @@ def error_serializer(req, resp, exception):
     preferred = req.client_prefers(('application/xml',
                                     'application/json',))
 
-    if preferred:
-        if preferred == 'application/json':
-            representation = exception.to_json()
-        else:
-            representation = exception.to_xml()
-        resp.body = representation
-        resp.content_type = preferred
+    if preferred is None:
+        preferred = 'application/json'
+    else:
+        resp.append_header('Vary', 'Accept')
+    if preferred == 'application/json':
+        representation = exception.to_json()
+    else:
+        representation = exception.to_xml()
+    resp.body = representation
+    resp.content_type = preferred
 
 
 def initialize_config(path, dir_path=None):
