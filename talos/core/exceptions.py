@@ -66,11 +66,16 @@ class Error(Exception):
 class CallBackError(Error):
     """接收并转换Restful错误异常"""
 
-    def __init__(self, message):
+    def __init__(self, message, exception_data=None):
         self._message = message
         if isinstance(message, dict):
             self.message = message.get('description', 'Unknown')
             self.code = message.get('code', 500)
+        self._exception_data = exception_data or {}
+        # code,title,description为保留字段
+        self._exception_data.pop('code', None)
+        self._exception_data.pop('title', None)
+        self._exception_data.pop('description', None)
         Exception.__init__(self, message)
 
     @property
