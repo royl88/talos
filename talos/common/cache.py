@@ -15,7 +15,8 @@
                 "port": 6379,
                 "db": 0,
                 "redis_expiration_time": 21600,
-                "distributed_lock": true
+                "distributed_lock": true,
+                "lock_timeout": 30 # 当使用分布式锁时，需要设置此项
             }
         }
 
@@ -29,16 +30,20 @@
 
 from __future__ import absolute_import
 
+import contextlib
+import logging
+
 from dogpile.cache import make_region
 from dogpile.cache.api import NO_VALUE
 from talos.core import config
 from talos.core import utils
 
-
 CONF = config.CONF
+LOG = logging.getLogger(__name__)
 
 
 class CacheProxy(object):
+
     def __init__(self):
         self.cache = None
 
@@ -100,3 +105,39 @@ def get_or_create(key, creator, expires=None):
 
 def delete(key):
     return CACHE.delete(key)
+
+
+@contextlib.contextmanager
+def distributed_lock(key, blocking=True):
+    '''
+    基于cache的简单分布式锁，使用dogpile.cache.redis/dogpile.cache.memcached时
+    
+    * 必须设置distributed_lock=true
+    * 可以设置lock_timeout代表单次上锁可以维持的时间(秒)，如果上锁超过lock_timeout，锁会被自动释放以防止死锁，如果不设置，默认不会自动释放
+    * dogpile中以redis，memcached为后端，锁是跨越线程,进程,主机的
+    * dogpile中以dbm为后端，锁是跨越线程,进程的
+    * dogpile中以memory为后端，锁是跨越线程
+    
+    使用方式：
+    
+    with distributed_lock(key) as locked:
+    if locked:
+        # 获取到锁，进行处理
+    else:
+        # 未获取到锁
+
+    :param key: 锁的名称
+    :param blocking: 是否阻塞式申请锁
+    '''
+    lock = CACHE.backend.get_mutex(key)
+    try:
+        # blocking=True(默认)时，进入with代表一定是获取到锁，locked主要用于blocking=False时的判断
+        locked = lock.acquire(blocking)
+        yield locked
+    finally:
+        # 锁可能会被自动释放引发异常
+        try:
+            if locked:
+                lock.release()
+        except Exception as e:
+            LOG.warning('exception raised when release lock: %s, reason: %s' % (key, e))
