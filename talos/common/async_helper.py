@@ -7,12 +7,11 @@ import logging
 import uuid
 
 from falcon.routing import util
-
 from talos.common import celery
-from talos.utils import http
 from talos.core import config
-from talos.core import utils as talos_util
 from talos.core import exceptions
+from talos.core import utils as talos_util
+from talos.utils import http
 
 
 LOG = logging.getLogger(__name__)
@@ -86,7 +85,7 @@ def send_callback(url_base, func, data, timeout=3, **kwargs):
     url_base = CONF.public_endpoint if url_base is None else url_base
     url = url_base + url
     http_method = getattr(http.RestfulJson, method, None)
-    LOG.debug('######## worker callback %s %s, data: %s', method, url, data)
+    LOG.debug('######## async_helper:send_callback %s %s, data: %s', method, url, data)
     result = http_method(url, json=data, timeout=timeout)
     return result
 

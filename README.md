@@ -717,7 +717,7 @@ cache.delete(key)
 
 ##### 定义异步任务
 
-建立workers.app_name.task.py用于编写远程任务
+建立workers.app_name.tasks.py用于编写远程任务
 建立workers.app_name.callback.py用于编写远程回调
 task.py任务示例
 
@@ -728,9 +728,13 @@ from cms.workers.app_name import callback
 @celery.app.task
 def add(task_id, x, y):
     result = x + y
-    # 这里还可以通知其他附加任务
+    # 这里还可以通知其他附加任务,当需要本次的一些计算结果来启动二次任务时使用
+    # 接受参数：task调用函数路径 & 函数命名参数(dict)
     async_helper.send_task('cms.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
    # send callback的参数必须与callback函数参数匹配(request，response除外)
+    # url_base为callback注册的api地址，eg: http://127.0.0.1:9001
+    # 仅接受data参数，若有多个参数，可打包为可json序列化的类型
+    # task_id为url接受参数(所以函数也必须接受此参数)
    async_helper.send_callback(url_base, callback.callback_add,
                                data,
                                task_id=task_id)
@@ -742,10 +746,12 @@ def add(task_id, x, y):
 callback.py回调示例
 ```python
 from talos.common import async_helper
-# 可以使用函数参数中的任意变量作为url的变量（为了某种情况下作为url区分），当然也可以不用
+# data是强制参数，task_id为url强制参数(如果url没有参数，则函数也无需task_id)
 @async_helper.callback('/callback/add/{task_id}')
 def callback_add(data, task_id, request=None, response=None):
-    db.save(task_id, result)
+    # 想要使用db功能，需要修改cms.server.celery_worker文件的默认项
+    # 移除 # base.initialize_db()的注释符号
+    task_db_api().update(task_id, data)
 ```
 
 route中添加回调
@@ -761,8 +767,10 @@ def add_route(api):
   celery -A cms.server.celery_worker worker --autoscale=50,4 --loglevel=DEBUG -Q your_queue_name
 
 调用
-  add('id', 1, 1).delay()
+  add.delay('id', 1, 1)
   会有任务发送到worker中，然后woker会启动一个other_task任务，并回调url将结果发送会服务端
+
+  (如果API模块有统一权限校验，请注意放行）
 
 ##### 异步任务配置
 
