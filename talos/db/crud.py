@@ -533,11 +533,13 @@ class ResourceBase(object):
         orm_meta = orm_meta or self.orm_meta
         filters = filters or {}
         # orders优先使用用户传递排序
-        if not ignore_default:
-            orders = self.default_order if orders is None else orders
-        else:
-            orders = orders or []
         orders = copy.copy(orders)
+        if orders is None:
+            orders = self.default_order
+        else:
+            if not ignore_default:
+                orders.extend(self.default_order)
+
         joins = joins or []
         ex_tables = [item['table'] for item in joins]
         tables = list(ex_tables)
