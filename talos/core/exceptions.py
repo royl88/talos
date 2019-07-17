@@ -8,8 +8,8 @@ from __future__ import absolute_import
 
 import json
 
-import dicttoxml
 from talos.core import utils
+from talos.core import xmlutils
 from talos.core.i18n import _
 
 
@@ -60,7 +60,7 @@ class Error(Exception):
 
     def to_xml(self):
         data = self.to_dict()
-        return dicttoxml.dicttoxml(data, custom_root='error')
+        return xmlutils.toxml(data, root_tag='error')
 
 
 class CallBackError(Error):
