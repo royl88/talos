@@ -11,15 +11,14 @@ import json
 import logging
 import sys
 
-import dicttoxml
 import falcon
 import six
-
 from talos.core import config
 from talos.core import exceptions
 from talos.core import i18n
 from talos.core import logging as mylogger
 from talos.core import utils
+from talos.core import xmlutils
 
 
 LOG = logging.getLogger(__name__)
@@ -52,7 +51,7 @@ class EnhancedHTTPError(falcon.HTTPError):
 
     def to_xml(self):
         data = self.to_dict(OrderedDict)
-        return dicttoxml.dicttoxml(data, custom_root='error')
+        return xmlutils.toxml(data, root_tag='error')
 
 
 def error_http_exception(ex, req, resp, params):
