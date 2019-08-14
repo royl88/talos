@@ -17,7 +17,7 @@ from talos.core import utils
 _recursive_get = utils.get_item
 
 
-def export_csv(filename, rows, mapping):
+def export_csv(filename, rows, mapping, encoding='utf-8'):
     """
     导出CSV文件
 
@@ -41,14 +41,14 @@ def export_csv(filename, rows, mapping):
             ]
     :type mapping: list
     """
-    with codecs.open(filename, "w", encoding="gbk") as f:
+    with codecs.open(filename, "w", encoding=encoding, errors='replace') as f:
         csvwriter = csv.writer(f)
         headers = []
         for x in mapping:
             headers.append(x['column'])
         csvwriter.writerow(headers)
         for row in rows:
-            gbk_row = []
+            row_data = []
             for x in mapping:
                 if isinstance(x['index'], int) and isinstance(row, (list, tuple, set)):
                     value = row[x['index']]
@@ -61,13 +61,13 @@ def export_csv(filename, rows, mapping):
                 elif 'xrenderer' in x:
                     render = x['xrenderer']
                     value = render(row, value)
-                gbk_row.append(value)
-            csvwriter.writerow(gbk_row)
+                row_data.append(value)
+            csvwriter.writerow(row_data)
         return True
     return False
 
 
-def export_csv_as_string(rows, mapping):
+def export_csv_as_string(rows, mapping, encoding='utf-8'):
     """
     导出CSV，并返回CSV文件内容字符串
 
@@ -92,9 +92,9 @@ def export_csv_as_string(rows, mapping):
     :rtype: str
     """
     filepath = tempfile.mkdtemp(prefix='__csv_exporter')
-    filename = os.path.join(filepath, 'test.csv')
+    filename = os.path.join(filepath, 'export.csv')
     try:
-        export_csv(filename, rows, mapping)
+        export_csv(filename, rows, mapping, encoding=encoding)
         with open(filename, 'rb') as f:
             return f.read()
     finally:
