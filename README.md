@@ -717,8 +717,6 @@ cache.delete(key)
 
 ##### 定义异步任务
 
-> talos >=1.3.0 callback装饰器的参数，增加了with_request，with_response参数，默认均为False，如果为True，回调函数可接受额外的request,response参数，如def add(data, x, y, request)
-
 > talos >=1.3.0 send_callback函数，移除了timeout，增加了request_context，为requests请求参数的options的字典，eg.{'timeout': 3}
 
 > talos >=1.3.0 回调函数参数，移除了request和response的强制参数定义，保留data和url模板强制参数，如果callback(with_request=True)，则回调函数需定义如下，with_response同理
@@ -736,18 +734,18 @@ cache.delete(key)
 >     本地调用：
 >     add(data, x, y)，可以作为普通本地函数调用(注：客户端运行）
 >     
->     send_callback远程调用方式：
+>     send_callback远程调用方式(x,y参数必须用kwargs形式传参)：
 >     send_callback(None, add, data, x=1, y=7)
 >     
 >     快速远程调用：
->     支持设置context，baseurl进行调用，context为requests库的额外参数，比如headers，timeout，verify等，baseurl默认为配置项的public_endpoint
+>     支持设置context，baseurl进行调用，context为requests库的额外参数，比如headers，timeout，verify等，baseurl默认为配置项的public_endpoint(x,y参数必须用kwargs形式传参)
 >     
 >     test.remote({'val': '123'}, x=1, y=7)
 >     test.context(timeout=10, params={'search': 'me'}).remote({'val': '123'}, x=1, y=7)
 >     test.context(timeout=10).baseurl('http://clusterip.of.app.com').remote({'val': '123'}, x=1, y=7)
 
 建立workers.app_name.tasks.py用于编写远程任务
-建立workers.app_name.callback.py用于编写远程回调
+建立workers.app_name.callback.py用于编写远程调用
 task.py任务示例
 
 ```python
@@ -757,39 +755,41 @@ from cms.workers.app_name import callback
 @celery.app.task
 def add(data, task_id):
     result = {'result': data['x'] + data['y']}
+
     # 这里还可以通知其他附加任务,当需要本次的一些计算结果来启动二次任务时使用
     # 接受参数：task调用函数路径 & 函数命名参数(dict)
-    async_helper.send_task('cms.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
+    # async_helper.send_task('cms.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
 
    # 异步任务中默认不启用数据库连接，因此需要使用远程调用callback方式进行数据读取和回写
-   # 如果想要使用db功能，需要修改cms.server.celery_worker文件的代码
-   # 移除 # base.initialize_db()的注释符号
+   # 如果想要使用db功能，需要修改cms.server.celery_worker文件的代码,移除 # base.initialize_db()的注释符号
 
    # send callback的参数必须与callback函数参数匹配(request，response除外)
-   # url_base为callback注册的api地址，eg: http://127.0.0.1:9001
-   # 仅接受data参数，若有多个参数，可打包为可json序列化的类型
-   # task_id为url接受参数(所以函数也必须接受此参数)
-   # async_helper.send_callback(url_base, callback.callback_add,
+   # url_base为callback实际运行的服务端api地址，eg: http://127.0.0.1:9000
+   # update_task函数接受data和task_id参数，其中task_id必须为kwargs形式传参
+   # async_helper.send_callback(url_base, callback.update_task,
    #                             data,
    #                            task_id=task_id)
-   callback.callback_add.remote(result, task_id=task_id)
+   # remote_result 对应数据为update_task返回的 res_after
+   remote_result = callback.update_task.remote(result, task_id=task_id)
    # 此处是异步回调结果，不需要服务器等待或者轮询，worker会主动发送进度或者结果，可以不return
    # 如果想要使用return方式，则按照正常celery流程编写代码
    return result
 ```
 
-callback.py回调示例(callback不应理解为异步任务的回调函数，应该泛指talos的通用rpc远程调用，只是目前框架内主要使用方是异步任务)
+callback.py回调示例 (callback不应理解为异步任务的回调函数，泛指talos的通用rpc远程调用，只是目前框架内主要使用方是异步任务)
 ```python
 from talos.common import async_helper
 # data是强制参数，task_id为url强制参数(如果url没有参数，则函数也无需task_id)
-# url强制参数，默认类型是字符串(比如/callback/add/{x}/{y}，函数内直接执行x+y结果会是字符串拼接，因为由于此参数从url中提取，所以默认类型为str，需要特别注意)
+# task_id为url强制参数，默认类型是字符串(比如/callback/add/{x}/{y}，函数内直接执行x+y结果会是字符串拼接，因为由于此参数从url中提取，所以默认类型为str，需要特别注意)
 @async_helper.callback('/callback/add/{task_id}')
-def callback_add(data, task_id, request=None, response=None):
+def update_task(data, task_id):
     # 远程调用真正执行方在api server服务，因此默认可以使用数据库操作
-    task_db_api().update(task_id, data)
+    res_before,res_after = task_db_api().update(task_id, data)
+    # 函数可返回可json化的数据，并返回到调用客户端去
+    return res_after
 ```
 
-route中添加回调
+route中注册回调函数，否则无法找到此远程调用
 ```python
 from talos.common import async_helper
 from project_name.workers.app_name import callback
@@ -806,6 +806,8 @@ def add_route(api):
   会有任务发送到worker中，然后woker会启动一个other_task任务，并回调url将结果发送会服务端
 
   (如果API模块有统一权限校验，请注意放行）
+
+
 
 ##### 异步任务配置
 
@@ -843,6 +845,8 @@ def add_route(api):
         }
 }
 ```
+
+
 
 
 

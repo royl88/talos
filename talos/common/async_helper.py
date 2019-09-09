@@ -2,10 +2,8 @@
 
 from __future__ import absolute_import
 
-import functools
 import logging
 import uuid
-import weakref
 
 from falcon.routing import util
 from talos.common import celery
@@ -85,8 +83,8 @@ def send_callback(url_base, func, data, request_context=None, **kwargs):
     :param request_context:
     :type request_context:
     """
-    url = func.__url
-    method = func.__method.lower()
+    url = func.url_path
+    method = func.method.lower()
     request_context = request_context or {}
     request_context.setdefault('timeout', 3)
     request_context.setdefault('verify', False)
@@ -132,36 +130,52 @@ def callback(url, name=None, method='POST', with_request=False, with_response=Fa
     test.context(timeout=10).baseurl('http://clusterip.of.app.com').remote({'val': '123'}, order_id='order_20190193922')
     """
     def _wraps(func):
-        @functools.wraps(func)
-        def __wraps(data, **kwargs):
-            return func(data=data, **kwargs)
+        class __wraps_c(object):
+            def __init__(self, base_url=None, requests_ctx=None):
+                self.__url = url
+                self.__name = name
+                self.__method = method
+                self.__with_request = with_request
+                self.__with_response = with_response
+                self.__base_url = base_url
+                self.__requests_ctx = requests_ctx
 
-        __wraps.__url = url
-        __wraps.__name = name
-        __wraps.__method = method
-        __wraps.__with_request = with_request
-        __wraps.__with_response = with_response
-        __wraps.__base_url = None
-        __wraps.__requests_ctx = None
+            @property
+            def url_path(self):
+                return self.__url
 
-        def context(**kwargs):
-            __wraps.__requests_ctx = kwargs
-            return __wraps
+            @property
+            def name(self):
+                return self.__name
 
-        def baseurl(url_prefix):
-            __wraps.__base_url = url_prefix
-            return __wraps
+            @property
+            def method(self):
+                return self.__method
 
-        def remote(data, **kwargs):
-            url_prefix = __wraps.__base_url
-            return send_callback(url_prefix, weakref.ref(__wraps)(), data,
-                                 request_context=__wraps.__requests_ctx, **kwargs)
+            @property
+            def with_request(self):
+                return self.__with_request
 
-        __wraps.context = context
-        __wraps.baseurl = baseurl
-        __wraps.remote = remote
+            @property
+            def with_response(self):
+                return self.__with_response
 
-        return __wraps
+            def __call__(self, data, **kwargs):
+                return func(data=data, **kwargs)
+
+            def context(self, **kwargs):
+                new_instance = self.__class__(base_url=self.__base_url, requests_ctx=kwargs)
+                return new_instance
+
+            def baseurl(self, url_prefix):
+                new_instance = self.__class__(base_url=url_prefix, requests_ctx=self.__requests_ctx)
+                return new_instance
+
+            def remote(self, data, **kwargs):
+                url_prefix = self.__base_url
+                return send_callback(url_prefix, self, data,
+                                     request_context=self.__requests_ctx, **kwargs)
+        return __wraps_c()
     return _wraps
 
 
@@ -173,11 +187,11 @@ def add_callback_route(api, func):
     :param func: @callback/@rpc装饰器包装的函数
     :type func: function
     """
-    url = func.__url
-    name = func.__name
-    method = func.__method.lower()
-    with_request = func.__with_request
-    with_response = func.__with_response
+    url = func.url_path
+    name = func.name
+    method = func.method.lower()
+    with_request = func.with_request
+    with_response = func.with_response
     api.add_route(url, CallbackController(func, method, name=name,
                                           with_request=with_request, with_response=with_response))
 
