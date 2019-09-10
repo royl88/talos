@@ -1,3 +1,3 @@
 from talos.server import base
 
-base.initialize_server('test', './tests/unittest.conf')
+API = base.initialize_server('test', './tests/unittest.conf')
