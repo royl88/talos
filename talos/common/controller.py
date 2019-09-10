@@ -94,7 +94,7 @@ class Controller(object):
         strip_query_dict = {}
         for key, value in query_dict.items():
             if key.endswith('[]'):
-                strip_query_dict[key[:-2]] = value
+                strip_query_dict[key[:-2]] = value if utils.is_list_type(value) else [value]
             else:
                 strip_query_dict[key] = value
         query_dict = strip_query_dict
