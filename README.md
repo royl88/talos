@@ -1461,6 +1461,34 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 
 
 
+## CHANGELOG
+
+1.3.0:
+
+- 新增：多数据库连接池配置支持(CONF.dbs)
+- 新增：远程调用快捷模式(callback.remote(...))
+- 新增：基于redis的分布式锁支持(cache.distributed_lock)
+- 新增：抛出异常可携带额外数据(raise Error(exception_data=...),  e.to_dict())
+- 更新：默认捕获所有异常，返回统一异常结构
+- 更新：替换异常序列化to_xml库，由dicttoxml库更换为talos.core.xmlutils，提升效率，支持更多扩展
+- 更新：支持falcon 2.0
+- 修复：单元素的query数组错误解析为一个元素而非数组问题
+- 修复：exporter对异常编码的兼容问题
+
+1.2.2:
+
+- 优化频率限制，支持类级/函数级频率限制，更多复杂场景 
+- 完善单元测试 
+- JSONB复杂查询支持 
+- 优化一些小细节
+
+1.2.1：
+- 见 [tags](https://gitee.com/wu.jianjun/talos/tags)
+
+...
+
+
+
 [^1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
