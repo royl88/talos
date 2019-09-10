@@ -21,7 +21,11 @@ class ValueNotSet(object):
 class Config(Mapping):
     """"表示一组或者多组实际的配置项"""
 
-    def __init__(self, opts):
+    def __init__(self, opts, raise_not_exist=True):
+        self._opts = opts or {}
+        self._raise_not_exist = raise_not_exist
+
+    def set_options(self, opts):
         self._opts = opts or {}
 
     def from_files(self, opt_files, ignore_undefined):
@@ -85,7 +89,8 @@ class Config(Mapping):
                 return Config(value)
             return value
         except KeyError:
-            raise AttributeError("No Such Option: %s" % name)
+            if self._raise_not_exist:
+                raise AttributeError("No Such Option: %s" % name)
 
     def __getitem__(self, key):
         """魔法函数，实现类字典访问"""
@@ -214,6 +219,8 @@ CONFIG_OPTS = {
         # 'pool_recycle': 60 * 60,
         # 'pool_timeout': 5,
         # 'max_overflow': 5,
+    },
+    'dbs': {
     },
     'dbcrud': {
         'unsupported_filter_as_empty': False

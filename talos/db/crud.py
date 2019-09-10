@@ -298,6 +298,8 @@ class ResourceBase(object):
     """
     # 使用的ORM Model
     orm_meta = None
+    # DB连接池对象，若不指定，默认使用defaultPool
+    orm_pool = None
     # 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表
     _primary_keys = 'id'
     # 默认过滤查询，应用于每次查询本类资源，此处应当是静态数据，不可被更改
@@ -315,7 +317,7 @@ class ResourceBase(object):
     _validate = []
 
     def __init__(self, session=None, transaction=None, dbpool=None):
-        self._pool = dbpool or pool.POOL
+        self._pool = dbpool or self.orm_pool or pool.defaultPool
         self._session = session
         self._transaction = transaction
 

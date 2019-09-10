@@ -603,7 +603,39 @@ class Department(Base, DictBase):
 
 6. Converter同上
 
-#### 高级DB操作[hooks, 自定义query]
+#### 多数据库支持 [^ 6]
+
+默认情况下，项目只会生成一个数据库连接池：对应配置项CONF.db.xxxx，若需要多个数据库连接池，则需要手动指定配置文件
+
+```
+"dbs": {
+    "read_only": {
+        "connection": "sqlite:///tests/a.sqlite3"
+    },
+    "other_cluster": {
+        "connection": "sqlite:///tests/b.sqlite3"
+    }
+},
+```
+
+使用方式也简单，如下，生效优先级为：实例化参数 > 类属性orm_pool > defaultPool
+
+```python
+# 1. 在类属性中指定 
+class Users(ResourceBase):
+    orm_meta = models.Users
+    orm_pool = pool.POOLS.read_only
+    
+# 2. 实例化时指定
+Users(dbpool=pool.POOLS.readonly)
+
+# 3. 若都不指定，默认使用defaultPool，即CONF.db配置的连接池
+```
+
+
+
+
+#### DB Hook操作
 
 ##### 简单hooks
 
@@ -1400,6 +1432,7 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 | db.pool_recycle                        | int    | 连接最大空闲时间，超过时间后自动回收                         | 3600                                                         |
 | db.pool_timeout                        | int    | 获取连接超时时间，单位秒                                     | 5                                                            |
 | db.max_overflow                        | int    | 突发连接池扩展大小                                           | 5                                                            |
+| dbs[^ 6]                               | dict   | 额外的数据库配置项，{name: {db conf...}}，配置项会被初始化到pool.POOLS中，并以名称作为引用名，示例见进阶开发->多数据库支持 |                                                              |
 | dbcrud                                 | dict   | 数据库CRUD控制项                                             |                                                              |
 | dbcrud.unsupported_filter_as_empty     | bool   | 当遇到不支持的filter时的默认行为，1是返回空结果，2是忽略不支持的条件，由于历史版本的行为默认为2，因此其默认值为False，即忽略不支持的条件 | False                                                        |
 | cache                                  | dict   | 缓存配置项                                                   |                                                              |
@@ -1433,3 +1466,4 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
 [^ 4]: v1.2.0版本增加了__fields字段选择 以及 null, notnull, nlike, nilike的查询条件 以及 relationship查询支持
 [^ 5]: v1.2.0版本新增$or,$and查询支持
+[^ 6]: v1.3.0版本新增多数据库连接池支持

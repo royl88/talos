@@ -132,9 +132,19 @@ def initialize_db():
     CONF = config.CONF
     try:
         if CONF.db.connection:
-            pool.POOL.reflesh(param=CONF.db.to_dict())
+            pool.defaultPool.reflesh(param=CONF.db.to_dict())
     except AttributeError:
         LOG.warning("config db.connection not set, skip")
+    # 初始化附加DB连接
+    try:
+        if CONF.dbs:
+            db_confs = CONF.dbs.to_dict()
+            conns = {}
+            for name, param in db_confs.items():
+                conns[name] = pool.DBPool(param=param)
+            pool.POOLS.set_options(conns)
+    except AttributeError:
+        LOG.warning("config dbs not set, skip")
 
 
 def initialize_applications(api):
