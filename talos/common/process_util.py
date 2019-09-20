@@ -19,9 +19,16 @@ def exec_command(command, timeout=None, raise_error=False, **kwargs):
     def timeout_callback(p, command):
         LOG.error(_('process(%(pid)s) execute timeout: %(command)s'), {'pid': p.pid, 'command': str(command)})
         try:
-            ps = psutil.Process(p.pid)
-            for p in ps.children(recursive=True):
-                p.kill()
+            _ps = psutil.Process(p.pid)
+            for _p in _ps.children(recursive=True):
+                try:
+                    _p.kill()
+                except psutil.NoSuchProcess:
+                    pass
+            try:
+                _ps.kill()
+            except psutil.NoSuchProcess:
+                pass
         except psutil.Error as e:
             LOG.exception(e)
     process = subprocess.Popen(
