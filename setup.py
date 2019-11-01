@@ -81,8 +81,9 @@ setup(
     # https://packaging.python.org/en/latest/single_source_version.html
     version=version,
 
-    description='A Falcon Base, Powerful RESTful API Framework',
+    description='A Falcon Base, Powerful RESTful API Framework, with SQLAlchemy integrated',
     long_description=long_description,
+    long_description_content_type='text/markdown',
 
     # The project's main homepage.
     url='https://gitee.com/wu.jianjun/talos',
