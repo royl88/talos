@@ -1318,12 +1318,32 @@ talos.core.utils
 
 talos中预置了很多控制程序行为的配置项，可以允许用户进行相关的配置：全局配置、启动服务配置、日志配置、数据库连接配置、缓存配置、频率限制配置、异步和回调配置
 
+此外，还提供了配置项variables拦截预渲染能力[^ 6], 用户可以定义拦截某些配置项，并对其进行修改/更新（常用于密码解密）,然后对其他配置项的变量进行渲染替换，使用方式如下：
+
+```json
+{
+    "variables": {"db_password": "MTIzNDU2", "other_password": "..."}
+    "db": {"connection": "mysql://test:${db_password}@127.0.0.1:1234/db01"}
+}
+```
+
+如上，variables中定义了定义了db_password变量(**必须在variables中定义变量**)，并再db.connection进行变量使用(**除variables以外其他配置项均可使用${db_password}变量进行待渲染**)
+
+在您自己的项目的server.wsgi_server 以及 server.celery_worker代码开始位置使用如下拦截：
+
+```python
+
+```
+
+
+
 | 路径                                   | 类型   | 描述                                                         | 默认值                                                       |
 | -------------------------------------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | host                                   | string | 主机名                                                       | 当前主机名                                                   |
 | language                               | string | 系统语言翻译                                                 | en                                                           |
 | locale_app                             | string | 国际化locale应用名称                                         | 当前项目名                                                   |
 | locale_path                            | string | 国际化locale文件路径                                         | ./etc/locale                                                 |
+| variables                              | dict   | 可供拦截预渲染的变量名及其值                                 | {}                                                           |
 | controller.list_size_limit_enabled     | bool   | 是否启用全局列表大小限制                                     | False                                                        |
 | controller.list_size_limit             | int    | 全局列表数据大小，如果没有设置，则默认返回全部，如果用户传入limit参数，则以用户参数为准 | None                                                         |
 | controller.criteria_key.offset         | string | controller接受用户的offset参数的关键key值                    | __offset                                                     |
@@ -1381,8 +1401,9 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 
 
 
-[^1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
+[^ 1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
 [^ 4]: v1.2.0版本增加了__fields字段选择 以及 null, notnull, nlike, nilike的查询条件 以及 relationship查询支持
 [^ 5]: v1.2.0版本新增$or,$and查询支持
+[^ 6]: v1.2.3版本后开始支持

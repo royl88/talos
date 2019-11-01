@@ -9,8 +9,33 @@ from __future__ import absolute_import
 from collections import Mapping
 import copy
 import json
+import functools
 
+from mako.template import Template
 from talos.core import utils
+
+VAR_REGISTER = {}
+
+
+def intercept(*vars):
+    def _intercept(func):
+        @functools.wraps(func)
+        def __intercept(*args, **kwargs):
+            ret = func(*args, **kwargs)
+            return ret
+
+        for var in vars:
+            funcs = VAR_REGISTER.setdefault(var, [])
+            funcs.append(__intercept)
+        return __intercept
+    return _intercept
+
+def call_intercepters(var, value):
+    funcs = VAR_REGISTER.get(var, [])
+    new_value = value
+    for func in funcs:
+        new_value = func(new_value, value)
+    return new_value
 
 
 class ValueNotSet(object):
@@ -19,9 +44,16 @@ class ValueNotSet(object):
 
 
 class Config(Mapping):
-    """"表示一组或者多组实际的配置项"""
+    """表示一组或者多组实际的配置项"""
 
     def __init__(self, opts):
+        self._opts = opts or {}
+
+    def __repr__(self):
+        return str(self._opts)
+
+    def __call__(self, opts):
+        """用另外一个opts来重新初始化自己"""
         self._opts = opts or {}
 
     def from_files(self, opt_files, ignore_undefined):
@@ -134,26 +166,6 @@ class Config(Mapping):
         return self._opts
 
 
-class Configuration(object):
-    """
-    代理配置类，访问这个类的属性都会被转发到Config实际属性
-
-    此外还可以重写Config函数以实现拦截(或称delegation)
-    """
-
-    def __init__(self, config):
-        self._config = config
-
-    def __repr__(self):
-        return str(self._config)
-
-    def __getattr__(self, attr):
-        return getattr(self._config, attr)
-
-    def __call__(self, config):
-        self._config = config
-
-
 def setup(path, default_opts=None, dir_path=None, ignore_undefined=False):
     """
     载入配置文件
@@ -172,7 +184,15 @@ def setup(path, default_opts=None, dir_path=None, ignore_undefined=False):
 
     config = Config(copy.deepcopy(default_opts))
     config.from_files(config_files, ignore_undefined=ignore_undefined)
-    CONF(config)
+    if config.variables.to_dict():
+        context = {}
+        for k,v in config.variables.items():
+            context[k] = call_intercepters(k, v)
+        opts = config.to_dict()
+        s_opts = json.dumps(opts)
+        tpl = Template(s_opts, strict_undefined=True)
+        config = Config(json.loads(tpl.render(**context)))
+    CONF(config.to_dict())
 
 
 UNSET = ValueNotSet()
@@ -188,6 +208,8 @@ CONFIG_OPTS = {
         'bind': '127.0.0.1',
         'port': 9001,
         'backlog': 2048,
+    },
+    "variables": {
     },
     'controller': {
         'list_size_limit_enabled': False,
@@ -242,4 +264,4 @@ CONFIG_OPTS = {
 
 }
 
-CONF = Configuration(None)
+CONF = Config(None)
