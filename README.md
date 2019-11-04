@@ -765,13 +765,13 @@ cache.delete(key)
 >
 >     本地调用：
 >     add(data, x, y)，可以作为普通本地函数调用(注：客户端运行）
->     
+>    
 >     send_callback远程调用方式(x,y参数必须用kwargs形式传参)：
 >     send_callback(None, add, data, x=1, y=7)
->     
+>    
 >     快速远程调用：
 >     支持设置context，baseurl进行调用，context为requests库的额外参数，比如headers，timeout，verify等，baseurl默认为配置项的public_endpoint(x,y参数必须用kwargs形式传参)
->     
+>    
 >     test.remote({'val': '123'}, x=1, y=7)
 >     test.context(timeout=10, params={'search': 'me'}).remote({'val': '123'}, x=1, y=7)
 >     test.context(timeout=10).baseurl('http://clusterip.of.app.com').remote({'val': '123'}, x=1, y=7)
@@ -1511,6 +1511,10 @@ def get_password(value, origin_value):
 - 更新：支持falcon 2.0
 - 修复：单元素的query数组错误解析为一个元素而非数组问题
 - 修复：exporter对异常编码的兼容问题
+
+1.2.3:
+
+- 优化支持配置项变量/拦截/预渲染(常用于配置项的加解密) 
 
 1.2.2:
 
