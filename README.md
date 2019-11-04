@@ -1411,8 +1411,25 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 在您自己的项目的server.wsgi_server 以及 server.celery_worker代码开始位置使用如下拦截：
 
 ```python
+import base64
+from talos.core import config
 
+@config.intercept('db_password', 'other_password')
+def get_password(value, origin_value):
+    '''value为上一个拦截器处理后的值（若此函数为第一个拦截器，等价于origin_value）
+       origin_value为原始配置文件的值
+       没有拦截的变量talos将自动使用原始值，因此定义一个拦截器是很关键的
+       函数处理后要求必须返回一个值
+    '''
+    # 演示使用不安全的base64，请使用你认为安全的算法进行处理
+    return base64.b64decode(origin_value)
+
+...
 ```
+
+> 为什么要在server.wsgi_server 以及 server.celery_worker代码开始位置拦截？
+>
+> 因为配置项为预渲染，即程序启动时，就将配置项正确渲染到变量中，以便用户代码能取到正确的配置值，放到其他位置会出现部分代码得到处理前值，部分代码得到处理后值，结果将无法保证一致，因此server.wsgi_server 以及 server.celery_worker代码开始位置设置拦截是非常关键的
 
 
 
