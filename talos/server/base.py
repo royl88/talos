@@ -19,7 +19,7 @@ from talos.core import i18n
 from talos.core import logging as mylogger
 from talos.core import utils
 from talos.core import xmlutils
-
+from talos.middlewares import lazy_init
 
 LOG = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ if six.PY2:
 
 
 class EnhancedHTTPError(falcon.HTTPError):
+
     def __init__(self, status, title=None, description=None, headers=None,
                  href=None, href_text=None, code=None, extra_data=None):
         super(EnhancedHTTPError, self).__init__(status, title, description, headers, href, href_text, code)
@@ -167,8 +168,8 @@ def initialize_middlewares(middlewares=None, override_defalut=False):
     else:
         mids = [
             globalvars.GlobalVars(),
-            limiter.Limiter(),
             json_translator.JSONTranslator(),
+            lazy_init.LazyInit(limiter.Limiter),
         ]
     middlewares = middlewares or []
     mids.extend(middlewares)
