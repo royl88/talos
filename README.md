@@ -1361,9 +1361,9 @@ Linux：msgfmt --output-file=cms.mo cms.po
 
 将mo文件发布到
 
-/etc/fitportal/locale/$lang/LC_MESSAGES/
+/etc/{$your_project}/locale/{$lang}/LC_MESSAGES/
 
-$lang即配置项中的language
+{$lang}即配置项中的language
 
 
 
