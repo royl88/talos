@@ -765,13 +765,13 @@ cache.delete(key)
 >
 >     本地调用：
 >     add(data, x, y)，可以作为普通本地函数调用(注：客户端运行）
->    
+>        
 >     send_callback远程调用方式(x,y参数必须用kwargs形式传参)：
 >     send_callback(None, add, data, x=1, y=7)
->    
+>        
 >     快速远程调用：
 >     支持设置context，baseurl进行调用，context为requests库的额外参数，比如headers，timeout，verify等，baseurl默认为配置项的public_endpoint(x,y参数必须用kwargs形式传参)
->    
+>        
 >     test.remote({'val': '123'}, x=1, y=7)
 >     test.context(timeout=10, params={'search': 'me'}).remote({'val': '123'}, x=1, y=7)
 >     test.context(timeout=10).baseurl('http://clusterip.of.app.com').remote({'val': '123'}, x=1, y=7)
@@ -1459,14 +1459,22 @@ def get_password(value, origin_value):
 | log.log_console                        | bool   | 是否将日志重定向到标准输出                                   | True                                                         |
 | log.gunicorn_access                    | string | gunicorn的access日志路径                                     | ./access.log                                                 |
 | log.gunicorn_error                     | string | gunicorn的error日志路径                                      | ./error.log                                                  |
-| log.path                               | string | 全局日志路径                                                 | ./server.log                                                 |
+| log.path                               | string | 全局日志路径，默认使用WatchedFileHandler，当指定handler时此项无效 | ./server.log                                                 |
 | log.level                              | string | 日志级别                                                     | INFO                                                         |
+| log.handler[^ 7]                       | string | 定义的Logger类，eg: logging.handlers:SysLogHandler，定义此项后会优先使用并忽略默认的log.path |                                                              |
+| log.handler_args[^ 7]                  | list   | 定义的Logger类的初始化参数，eg: []                           |                                                              |
 | log.format_string                      | string | 日志字段配置                                                 | %(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s |
 | log.date_format_string                 | string | 日志时间格式                                                 | %Y-%m-%d %H:%M:%S                                            |
 | log.loggers                            | list   | 模块独立日志配置，列表每个元素是dict: [{"name": "cms.test.api", "path": "api.log"}] |                                                              |
-| log.loggers.name                       | string | 模块名称路径，如cms.apps.test                                |                                                              |
-| log.loggers.level                      | string | 日志级别                                                     |                                                              |
-| log.loggers.path                       | string | 日志路径                                                     |                                                              |
+| log.loggers.name                       | string | 模块名称路径，如cms.apps.test，可以被重复定义使用            |                                                              |
+| log.loggers.level                      | string | 参考log.level                                                |                                                              |
+| log.loggers.path                       | string | 参考log.path                                                 |                                                              |
+| log.loggers.handler[^ 7]               | string | 参考log.handler                                              |                                                              |
+| log.loggers.handler_args[^ 7]          | list   | 参考log.handler_args                                         |                                                              |
+| log.loggers.propagate[^ 7]             | bool   | 参考log.propagate                                            |                                                              |
+| log.loggers.log_console[^ 7]           | bool   | 参考log.log_console                                          |                                                              |
+| log.loggers.format_string[^ 7]         | string | 参考log.format_string                                        |                                                              |
+| log.loggers.date_format_string[^ 7]    | string | 参考log.date_format_string                                   |                                                              |
 | db                                     | dict   | 默认数据库配置项，用户可以自行定义其他DB配置项，但需要自己初始化DBPool对象(可以参考DefaultDBPool进行单例控制) |                                                              |
 | db.connection                          | string | 连接字符串                                                   |                                                              |
 | db.pool_size                           | int    | 连接池大小                                                   | 3                                                            |
@@ -1506,27 +1514,29 @@ def get_password(value, origin_value):
 
 1.3.0:
 
-- 新增：多数据库连接池配置支持(CONF.dbs)
-- 新增：远程调用快捷模式(callback.remote(...))
-- 新增：基于redis的分布式锁支持(cache.distributed_lock)
-- 新增：抛出异常可携带额外数据(raise Error(exception_data=...),  e.to_dict())
-- 更新：默认捕获所有异常，返回统一异常结构
-- 更新：替换异常序列化to_xml库，由dicttoxml库更换为talos.core.xmlutils，提升效率，支持更多扩展
-- 更新：生成模板：requirements，wsgi_server，celery_worker
-- 更新：支持falcon 2.0
-- 修复：单元素的query数组错误解析为一个元素而非数组问题
-- 修复：exporter对异常编码的兼容问题
+- 新增：[db] 多数据库连接池配置支持(CONF.dbs)
+- 新增：[worker] 远程调用快捷模式(callback.remote(...))
+- 新增：[cache] 基于redis的分布式锁支持(cache.distributed_lock)
+- 新增：[exception] 抛出异常可携带额外数据(raise Error(exception_data=...),  e.to_dict())
+- 更新：[exception] 默认捕获所有异常，返回统一异常结构
+- 更新：[exception] 替换异常序列化to_xml库，由dicttoxml库更换为talos.core.xmlutils，提升效率，支持更多扩展
+- 更新：[template] 生成模板：requirements，wsgi_server，celery_worker
+- 更新：[base] 支持falcon 2.0
+- 更新：[log] 支持自定义handler的log配置
+- ~~更新：[util] 支持协程级别的GLOABLS(支持thread/gevent/eventlet类型的worker)~~
+- 修复：[base] 单元素的query数组错误解析为一个元素而非数组问题
+- 修复：[util] exporter对异常编码的兼容问题
 
 1.2.3:
 
-- 优化支持配置项变量/拦截/预渲染(常用于配置项的加解密) 
+- 优化：[config] 支持配置项变量/拦截/预渲染(常用于配置项的加解密) 
 
 1.2.2:
 
-- 优化频率限制，支持类级/函数级频率限制，更多复杂场景 
-- 完善单元测试 
-- JSONB复杂查询支持 
-- 优化一些小细节
+- 优化：[util] 频率限制，支持类级/函数级频率限制，更多复杂场景 
+- 优化：[test] 完善单元测试 
+- 优化：[base] JSONB复杂查询支持 
+- 优化：[base] 一些小细节
 
 1.2.1：
 - 见 [tags](https://gitee.com/wu.jianjun/talos/tags)
@@ -1541,4 +1551,4 @@ def get_password(value, origin_value):
 [^ 4]: v1.2.0版本增加了__fields字段选择 以及 null, notnull, nlike, nilike的查询条件 以及 relationship查询支持
 [^ 5]: v1.2.0版本新增$or,$and查询支持
 [^ 6]: v1.2.3版本后开始支持
-[^ 7]: v1.3.0版本新增多数据库连接池支持
+[^ 7]: v1.3.0版本新增多数据库连接池支持以及日志handler选项
