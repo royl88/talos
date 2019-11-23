@@ -12,12 +12,12 @@ from talos.core import exceptions
 from talos.core import utils as talos_util
 from talos.utils import http
 
-
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
 
 class CallbackController(object):
+
     def __init__(self, func, method, name=None, with_request=False, with_response=False):
         self.name = name or uuid.uuid4().hex
         self.func = func
@@ -71,7 +71,7 @@ def send_callback(url_base, func, data, request_context=None, **kwargs):
     进行远程函数调用
 
     talos>=1.3.0: 建议使用func.remote(data, xxx)方式进行更便捷的远程调用
-    talos>=1.3.0: 移除了原有的timeout参数，全部封装到request_context参数中，默认有timeout=3,verify=False
+    talos>=1.3.0: 移除了原有的timeout参数，全部封装到request_context参数中，默认有timeout=10,verify=False
                  可以使用func.context(timeout=30).remote(data, xxx)进行context参数的修改
 
     :param url_base:
@@ -86,7 +86,7 @@ def send_callback(url_base, func, data, request_context=None, **kwargs):
     url = func.url_path
     method = func.method.lower()
     request_context = request_context or {}
-    request_context.setdefault('timeout', 3)
+    request_context.setdefault('timeout', 10)
     request_context.setdefault('verify', False)
     vars, pattern = util.compile_uri_template(url)
     for var in vars:
@@ -129,8 +129,11 @@ def callback(url, name=None, method='POST', with_request=False, with_response=Fa
     test.context(timeout=10, headers={'X-Auth-Token': 'token_1'}).remote({'val': '123'}, order_id='order_20190193922')
     test.context(timeout=10).baseurl('http://clusterip.of.app.com').remote({'val': '123'}, order_id='order_20190193922')
     """
+
     def _wraps(func):
+
         class __wraps_c(object):
+
             def __init__(self, base_url=None, requests_ctx=None):
                 self.__url = url
                 self.__name = name
@@ -175,7 +178,9 @@ def callback(url, name=None, method='POST', with_request=False, with_response=Fa
                 url_prefix = self.__base_url
                 return send_callback(url_prefix, self, data,
                                      request_context=self.__requests_ctx, **kwargs)
+
         return __wraps_c()
+
     return _wraps
 
 
