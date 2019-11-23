@@ -1,6 +1,5 @@
 # coding=utf-8
 
-import time
 import logging
 import pytest
 import multiprocessing as concurrent
@@ -16,22 +15,21 @@ LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
 
-def proc(lock):
+def _server_proc(l):
     try:
-        
         application = base.initialize_server('test', './tests/unittest.conf')
         bind_addr = CONF.server.bind
         port = CONF.server.port
         print("Serving on %s:%d..." % (bind_addr, port))
         httpd = make_server(bind_addr, port, application)
     finally:
-        lock.release()
+        l.release()
     httpd.handle_request()
 
 
 def start_server(lock):
     lock.acquire()
-    p = concurrent.Process(target=proc, args=(lock,))
+    p = concurrent.Process(target=_server_proc, args=(lock,))
     p.start()
     return p
 
@@ -44,10 +42,9 @@ def test_add_local():
 def test_add_remmote():
     l = concurrent.Lock()
     p = start_server(l)
-    time.sleep(1.0)
     
     try:
-        l.acquire(timeout=15)
+        l.acquire(timeout=20)
         ret = callback.add.remote(None, x=3, y=4)
         assert ret['result'] == 7
     finally:
@@ -63,10 +60,9 @@ def test_timeout_baseurl():
 def test_timeout_context():
     l = concurrent.Lock()
     p = start_server(l)
-    time.sleep(1.0)
     with pytest.raises(exceptions.CallBackError):
         try:
-            l.acquire(timeout=15)
+            l.acquire(timeout=20)
             ret = callback.timeout.context(timeout=1).remote(None)
         finally:
             l.release()
