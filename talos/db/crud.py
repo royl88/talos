@@ -815,9 +815,10 @@ class ResourceBase(object):
         # 校验=> orm, extra
         # 为了避免重复调用校验器，因此获取一次全量字段，然后进行一次orm字段筛选即可
         all_fields = resource
+        orm_fields = resource
         if validate:
             all_fields = self.validate(resource, utils.get_function_name(), orm_required=False, validate=True)
-        orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
+            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
                 item = self.orm_meta(**orm_fields)
@@ -863,9 +864,10 @@ class ResourceBase(object):
         # 校验=> orm, extra
         # 为了避免重复调用校验器，因此获取一次全量字段，然后进行一次orm字段筛选即可
         all_fields = resource
+        orm_fields = resource
         if validate:
             all_fields = self.validate(resource, utils.get_function_name(), orm_required=False, validate=True)
-        orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
+            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
                 query = self._get_query(session)
