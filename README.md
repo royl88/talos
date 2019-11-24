@@ -1395,6 +1395,17 @@ talos.core.utils
 
 ## 配置项
 
+talos提供了一个类字典的属性访问配置类
+1. 当属性是标准变量命名且非预留函数名时，可直接a.b.c方式访问
+2. 否则可以使用a['b-1'].c访问(item方式访问时会返回Config对象)
+3. 当属性值刚好Config已存在函数相等时，将进行函数调用而非属性访问！！！
+   保留函数名如下：set_options，from_files，iterkeys，itervalues，iteritems，keys，values，items，get，to_dict，_opts，python魔法函数
+
+比如{
+        "my_config": {"from_files": {"a": {"b": False}}}
+    }
+无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取，talos会在项目启动时给予提示，请您关注[^8]
+
 ### 预渲染项
 
 talos中预置了很多控制程序行为的配置项，可以允许用户进行相关的配置：全局配置、启动服务配置、日志配置、数据库连接配置、缓存配置、频率限制配置、异步和回调配置
@@ -1523,9 +1534,10 @@ def get_password(value, origin_value):
 - 更新：[template] 生成模板：requirements，wsgi_server，celery_worker
 - 更新：[base] 支持falcon 2.0
 - 更新：[log] 支持自定义handler的log配置
-- ~~更新：[util] 支持协程级别的GLOABLS(支持thread/gevent/eventlet类型的worker)~~
+- 更新：[util] 支持协程级别的GLOABLS(支持thread/gevent/eventlet类型的worker)
 - 修复：[base] 单元素的query数组错误解析为一个元素而非数组问题
 - 修复：[util] exporter对异常编码的兼容问题
+- 修复：[crud] create/update重复校验输入值
 
 1.2.3:
 
@@ -1552,3 +1564,4 @@ def get_password(value, origin_value):
 [^ 5]: v1.2.0版本新增$or,$and查询支持
 [^ 6]: v1.2.3版本后开始支持
 [^ 7]: v1.3.0版本新增多数据库连接池支持以及日志handler选项
+[^ 8]: v1.3.0版本新增了Config项加载时的warnings，以提醒用户此配置项正确访问方式
