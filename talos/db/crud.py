@@ -242,8 +242,7 @@ class ColumnValidator(object):
                             data=data,
                             exception=str(e)))
                     if result is True:
-                        if not (orm_required and not col.orm_required):
-                            clean_data[field_name] = col.convert(field_value)
+                        clean_data[field_name] = col.convert(field_value)
                     else:
                         raise exceptions.ValidationError(attribute=field_name_display, msg=result)
                 else:
@@ -281,8 +280,7 @@ class ColumnValidator(object):
                             field_value = data[field]
                             break
                 if field_name is not None:
-                    if col.orm_required:
-                        clean_data[field_name] = col.convert(field_value)
+                    clean_data[field_name] = col.convert(field_value)
                 else:
                     if col.is_required(situation):
                         raise exceptions.FieldRequired(attribute=col.field)
@@ -813,20 +811,18 @@ class ResourceBase(object):
         """
         validate = False if not self._validate else validate
         self._before_create(resource, validate)
+        # 不校验 => orm，extra
+        # 校验=> orm, extra
+        # 为了避免重复调用校验器，因此获取一次全量字段，然后进行一次orm字段筛选即可
+        all_fields = resource
         if validate:
-            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=True)
-        else:
-            orm_fields = resource
+            all_fields = self.validate(resource, utils.get_function_name(), orm_required=False, validate=True)
+        orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
                 item = self.orm_meta(**orm_fields)
                 session.add(item)
                 session.flush()
-                if validate:
-                    all_fields = self.validate(resource, utils.get_function_name(),
-                                               orm_required=False, validate=True)
-                else:
-                    all_fields = resource
                 self._addtional_create(session, all_fields, item.to_dict())
                 if detail:
                     return item.to_detail_dict()
@@ -863,10 +859,13 @@ class ResourceBase(object):
         """
         validate = False if not self._validate else validate
         self._before_update(rid, resource, validate)
+        # 不校验 => orm，extra
+        # 校验=> orm, extra
+        # 为了避免重复调用校验器，因此获取一次全量字段，然后进行一次orm字段筛选即可
+        all_fields = resource
         if validate:
-            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=True)
-        else:
-            orm_fields = resource
+            all_fields = self.validate(resource, utils.get_function_name(), orm_required=False, validate=True)
+        orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
                 query = self._get_query(session)
@@ -884,11 +883,6 @@ class ResourceBase(object):
                     if orm_fields:
                         record.update(orm_fields)
                     session.flush()
-                    if validate:
-                        all_fields = self.validate(resource, utils.get_function_name(),
-                                                   orm_required=False, validate=True)
-                    else:
-                        all_fields = resource
                     if detail:
                         after_update = record.to_detail_dict()
                     else:
