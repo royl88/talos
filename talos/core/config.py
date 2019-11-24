@@ -10,15 +10,22 @@ from collections import Mapping
 import copy
 import json
 import functools
+import re
+import warnings
 
 from mako.template import Template
 from talos.core import utils
 
 VAR_REGISTER = {}
+CONFIG_RESERVED = ('set_options', 'from_files', 'iterkeys', 'itervalues', 'iteritems', 'keys', 'values', 'items', 'get', 'to_dict', '_opts',
+                   '_raise_not_exist',)
+NAME_RULE = re.compile('^[_a-zA-Z][_a-zA-Z0-9]*$')
 
 
 def intercept(*vars):
+
     def _intercept(func):
+
         @functools.wraps(func)
         def __intercept(*args, **kwargs):
             ret = func(*args, **kwargs)
@@ -28,7 +35,9 @@ def intercept(*vars):
             funcs = VAR_REGISTER.setdefault(var, [])
             funcs.append(__intercept)
         return __intercept
+
     return _intercept
+
 
 def call_intercepters(var, value):
     funcs = VAR_REGISTER.get(var, [])
@@ -38,23 +47,61 @@ def call_intercepters(var, value):
     return new_value
 
 
-class ValueNotSet(object):
-    """代表没有设置，需要报错以提示用户"""
-    pass
+def _valid_expr(keys):
+    return 'CONF.' + '.'.join([k['name'] if k.get('attr_type', True) else '["' + k['name'] + '"]' for k in keys])
 
+
+def _simple_expr(keys):
+    return 'CONF.' + '.'.join([k['name'] for k in keys])
+
+
+def _validate(data, kyes=None):
+    for key, value in data.items():
+        allkeys = copy.deepcopy(kyes) if kyes else []
+        o_key = {'name': key, 'attr_type': True}
+        allkeys.append(o_key)
+        if key.startswith('${') and key.endswith('}'):
+            pass
+        else:
+            if not NAME_RULE.match(key):
+                o_key['attr_type'] = False
+                warnings.warn('[config] access %s instead of %s' % (_valid_expr(allkeys), _simple_expr(allkeys)), SyntaxWarning)
+            if key in CONFIG_RESERVED:
+                o_key['attr_type'] = False
+                warnings.warn('[config] access %s instead of %s' % (_valid_expr(allkeys), _simple_expr(allkeys)), SyntaxWarning)
+        if isinstance(value, Mapping):
+            _validate(value, kyes=allkeys)
+                
 
 class Config(Mapping):
-    """表示一组或者多组实际的配置项"""
+    """
+    一个类字典的属性访问配置类， 表示一组或者多组实际的配置项
+    1. 当属性是标准变量命名且非预留函数名时，可直接a.b.c方式访问
+    2. 否则可以使用a['b-1'].c访问(item方式访问时会返回Config对象)
+    3. 当属性值刚好Config已存在函数相等时，将进行函数调用而非属性访问！！！
+       保留函数名如下：set_options，from_files，iterkeys，itervalues，iteritems，keys，values，items，get，to_dict，_opts，python魔法函数
+    比如{
+        "my_config": {"from_files": {"a": {"b": False}}}
+    }
+    无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取
+    """
 
-    def __init__(self, opts):
+    def __init__(self, opts, raise_not_exist=True):
         self._opts = opts or {}
+        _validate(self._opts)
+        self._raise_not_exist = raise_not_exist
+
+    def set_options(self, opts):
+        self._opts = opts or {}
+        _validate(self._opts)
 
     def __repr__(self):
-        return str(self._opts)
+        return '<Config(%s, raise_not_exist=%s)>' % (str(self._opts), self._raise_not_exist)
 
     def __call__(self, opts):
         """用另外一个opts来重新初始化自己"""
         self._opts = opts or {}
+        _validate(self._opts)
 
     def from_files(self, opt_files, ignore_undefined):
         """
@@ -86,20 +133,10 @@ class Config(Mapping):
                     else:
                         data_src[key] = data_dst[key]
 
-        def _check(data, name=None):
-            for key, value in data.items():
-                cur_name = copy.deepcopy(name) if name else []
-                cur_name.append(key)
-                if isinstance(value, dict):
-                    _check(value, name=cur_name)
-                if isinstance(value, ValueNotSet):
-                    invalid_key = '.'.join(cur_name)
-                    raise ValueError("config item: %s not set" % invalid_key)
-
         for opt_file in opt_files:
             with open(opt_file, 'r') as f:
                 _update(self._opts, json.load(f), ignore_undefined)
-        _check(self._opts)
+        _validate(self._opts)
 
     def __getattr__(self, name):
         """
@@ -113,15 +150,19 @@ class Config(Mapping):
         """
         try:
             value = self._opts[name]
-            if isinstance(value, dict):
+            if isinstance(value, Mapping):
                 return Config(value)
             return value
         except KeyError:
-            raise AttributeError("No Such Option: %s" % name)
+            if self._raise_not_exist:
+                raise AttributeError("No Such Option: %s" % name)
 
     def __getitem__(self, key):
         """魔法函数，实现类字典访问"""
-        return self._opts[key]
+        value = self._opts[key]
+        if isinstance(value, Mapping):
+            return Config(value)
+        return value
 
     def __contains__(self, key):
         """魔法函数，实现in操作访问"""
@@ -162,6 +203,13 @@ class Config(Mapping):
         "D.values() -> list of D's values"
         return [self._opts[key] for key in self._opts]
 
+    def get(self, key, default=None):
+        'D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None.'
+        try:
+            return self._opts[key]
+        except KeyError:
+            return default
+
     def to_dict(self):
         return self._opts
 
@@ -182,27 +230,25 @@ def setup(path, default_opts=None, dir_path=None, ignore_undefined=False):
         for filename in utils.walk_dir(dir_path, '*.conf'):
             config_files.append(filename)
 
-    config = Config(copy.deepcopy(default_opts))
-    config.from_files(config_files, ignore_undefined=ignore_undefined)
-    if config.variables.to_dict():
+    ref = Config(copy.deepcopy(default_opts))
+    ref.from_files(config_files, ignore_undefined=ignore_undefined)
+    if ref.variables.to_dict():
         context = {}
-        for k,v in config.variables.items():
+        for k, v in ref.variables.items():
             context[k] = call_intercepters(k, v)
-        opts = config.to_dict()
+        opts = ref.to_dict()
         s_opts = json.dumps(opts)
         tpl = Template(s_opts, strict_undefined=True)
-        config = Config(json.loads(tpl.render(**context)))
-    CONF(config.to_dict())
+        ref = Config(json.loads(tpl.render(**context)))
+    CONF(ref.to_dict())
 
-
-UNSET = ValueNotSet()
 
 # 程序所需的最小配置项
 CONFIG_OPTS = {
     'host': utils.get_hostname(),
     'language': 'en',
-    'locale_app': UNSET,
-    'locale_path': UNSET,
+    'locale_app': 'talos',
+    'locale_path': './etc/locale',
     'override_defalut_middlewares': False,
     'server': {
         'bind': '127.0.0.1',
@@ -231,11 +277,13 @@ CONFIG_OPTS = {
         'date_format_string': '%Y-%m-%d %H:%M:%S',
     },
     'db': {
-        'connection': UNSET,
+        'connection': None,
         # 'pool_size': 3,
         # 'pool_recycle': 60 * 60,
         # 'pool_timeout': 5,
         # 'max_overflow': 5,
+    },
+    'dbs': {
     },
     'dbcrud': {
         'unsupported_filter_as_empty': False

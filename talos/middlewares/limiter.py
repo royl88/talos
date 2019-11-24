@@ -5,6 +5,7 @@
 """
 from __future__ import absolute_import
 
+import functools
 import inspect
 import logging
 import time
@@ -12,12 +13,11 @@ import time
 from limits.errors import ConfigurationError
 from limits.storage import storage_from_string
 from limits.strategies import STRATEGIES
-
-from talos.common.decorators import LIMITEDS, LIMITEDS_EXEMPT
 from talos.common import limitwrapper
+from talos.common.decorators import LIMITEDS, LIMITEDS_EXEMPT
 from talos.core import config
 from talos.core.i18n import _
-import functools
+
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -148,7 +148,7 @@ class Limiter(object):
         if limit_reach:
             return self.callback(limiter_for_header, limit_for_header, failed_message)
 
-    def process_response(self, request, response, resource):
+    def process_response(self, request, response, resource, *args, **kwargs):
         """
         :param request:
         :param response:

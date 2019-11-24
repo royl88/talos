@@ -603,7 +603,39 @@ class Department(Base, DictBase):
 
 6. Converter同上
 
-#### 高级DB操作[hooks, 自定义query]
+#### 多数据库支持 [^ 7]
+
+默认情况下，项目只会生成一个数据库连接池：对应配置项CONF.db.xxxx，若需要多个数据库连接池，则需要手动指定配置文件
+
+```
+"dbs": {
+    "read_only": {
+        "connection": "sqlite:///tests/a.sqlite3"
+    },
+    "other_cluster": {
+        "connection": "sqlite:///tests/b.sqlite3"
+    }
+},
+```
+
+使用方式也简单，如下，生效优先级为：实例化参数 > 类属性orm_pool > defaultPool
+
+```python
+# 1. 在类属性中指定 
+class Users(ResourceBase):
+    orm_meta = models.Users
+    orm_pool = pool.POOLS.read_only
+    
+# 2. 实例化时指定
+Users(dbpool=pool.POOLS.readonly)
+
+# 3. 若都不指定，默认使用defaultPool，即CONF.db配置的连接池
+```
+
+
+
+
+#### DB Hook操作
 
 ##### 简单hooks
 
@@ -717,8 +749,35 @@ cache.delete(key)
 
 ##### 定义异步任务
 
-建立workers.app_name.task.py用于编写远程任务
-建立workers.app_name.callback.py用于编写远程回调
+> talos >=1.3.0 send_callback函数，移除了timeout，增加了request_context，为requests请求参数的options的字典，eg.{'timeout': 3}
+
+> talos >=1.3.0 回调函数参数，移除了request和response的强制参数定义，保留data和url模板强制参数，如果callback(with_request=True)，则回调函数需定义如下，with_response同理
+>
+> @callback('/add/{x}/{y}', with_request=True):
+>
+> def add(data, x, y, request):
+>
+> ​    pass
+
+> talos >=1.3.0 被callback装饰的回调函数，均支持本地调用/快速远程调用/send_callback调用
+>
+> talos <1.3.0支持本地调用/send_callback调用
+>
+>     本地调用：
+>     add(data, x, y)，可以作为普通本地函数调用(注：客户端运行）
+>        
+>     send_callback远程调用方式(x,y参数必须用kwargs形式传参)：
+>     send_callback(None, add, data, x=1, y=7)
+>        
+>     快速远程调用：
+>     支持设置context，baseurl进行调用，context为requests库的额外参数，比如headers，timeout，verify等，baseurl默认为配置项的public_endpoint(x,y参数必须用kwargs形式传参)
+>        
+>     test.remote({'val': '123'}, x=1, y=7)
+>     test.context(timeout=10, params={'search': 'me'}).remote({'val': '123'}, x=1, y=7)
+>     test.context(timeout=10).baseurl('http://clusterip.of.app.com').remote({'val': '123'}, x=1, y=7)
+
+建立workers.app_name.tasks.py用于编写远程任务
+建立workers.app_name.callback.py用于编写远程调用
 task.py任务示例
 
 ```python
@@ -726,29 +785,43 @@ from talos.common import celery
 from talos.common import async_helper
 from cms.workers.app_name import callback
 @celery.app.task
-def add(task_id, x, y):
-    result = x + y
-    # 这里还可以通知其他附加任务
-    async_helper.send_task('cms.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
+def add(data, task_id):
+    result = {'result': data['x'] + data['y']}
+
+    # 这里还可以通知其他附加任务,当需要本次的一些计算结果来启动二次任务时使用
+    # 接受参数：task调用函数路径 & 函数命名参数(dict)
+    # async_helper.send_task('cms.workers.app_name.tasks.other_task', kwargs={'result': result, 'task_id': task_id})
+
+   # 异步任务中默认不启用数据库连接，因此需要使用远程调用callback方式进行数据读取和回写
+   # 如果想要使用db功能，需要修改cms.server.celery_worker文件的代码,移除 # base.initialize_db()的注释符号
+
    # send callback的参数必须与callback函数参数匹配(request，response除外)
-   async_helper.send_callback(url_base, callback.callback_add,
-                               data,
-                               task_id=task_id)
+   # url_base为callback实际运行的服务端api地址，eg: http://127.0.0.1:9000
+   # update_task函数接受data和task_id参数，其中task_id必须为kwargs形式传参
+   # async_helper.send_callback(url_base, callback.update_task,
+   #                             data,
+   #                            task_id=task_id)
+   # remote_result 对应数据为update_task返回的 res_after
+   remote_result = callback.update_task.remote(result, task_id=task_id)
    # 此处是异步回调结果，不需要服务器等待或者轮询，worker会主动发送进度或者结果，可以不return
    # 如果想要使用return方式，则按照正常celery流程编写代码
    return result
 ```
 
-callback.py回调示例
+callback.py回调示例 (callback不应理解为异步任务的回调函数，泛指talos的通用rpc远程调用，只是目前框架内主要使用方是异步任务)
 ```python
 from talos.common import async_helper
-# 可以使用函数参数中的任意变量作为url的变量（为了某种情况下作为url区分），当然也可以不用
+# data是强制参数，task_id为url强制参数(如果url没有参数，则函数也无需task_id)
+# task_id为url强制参数，默认类型是字符串(比如/callback/add/{x}/{y}，函数内直接执行x+y结果会是字符串拼接，因为由于此参数从url中提取，所以默认类型为str，需要特别注意)
 @async_helper.callback('/callback/add/{task_id}')
-def callback_add(data, task_id, request=None, response=None):
-    db.save(task_id, result)
+def update_task(data, task_id):
+    # 远程调用真正执行方在api server服务，因此默认可以使用数据库操作
+    res_before,res_after = task_db_api().update(task_id, data)
+    # 函数可返回可json化的数据，并返回到调用客户端去
+    return res_after
 ```
 
-route中添加回调
+route中注册回调函数，否则无法找到此远程调用
 ```python
 from talos.common import async_helper
 from project_name.workers.app_name import callback
@@ -761,8 +834,12 @@ def add_route(api):
   celery -A cms.server.celery_worker worker --autoscale=50,4 --loglevel=DEBUG -Q your_queue_name
 
 调用
-  add('id', 1, 1).delay()
+  add.delay('id', 1, 1)
   会有任务发送到worker中，然后woker会启动一个other_task任务，并回调url将结果发送会服务端
+
+  (如果API模块有统一权限校验，请注意放行）
+
+
 
 ##### 异步任务配置
 
@@ -800,6 +877,8 @@ def add_route(api):
         }
 }
 ```
+
+
 
 
 
@@ -1282,9 +1361,9 @@ Linux：msgfmt --output-file=cms.mo cms.po
 
 将mo文件发布到
 
-/etc/fitportal/locale/$lang/LC_MESSAGES/
+/etc/{$your_project}/locale/{$lang}/LC_MESSAGES/
 
-$lang即配置项中的language
+{$lang}即配置项中的language
 
 
 
@@ -1316,6 +1395,19 @@ talos.core.utils
 
 ## 配置项
 
+talos提供了一个类字典的属性访问配置类
+1. 当属性是标准变量命名且非预留函数名时，可直接a.b.c方式访问
+2. 否则可以使用a['b-1'].c访问(item方式访问时会返回Config对象)
+3. 当属性值刚好Config已存在函数相等时，将进行函数调用而非属性访问！！！
+   保留函数名如下：set_options，from_files，iterkeys，itervalues，iteritems，keys，values，items，get，to_dict，_opts，python魔法函数
+
+比如{
+        "my_config": {"from_files": {"a": {"b": False}}}
+    }
+无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取，talos会在项目启动时给予提示，请您关注[^8]
+
+### 预渲染项
+
 talos中预置了很多控制程序行为的配置项，可以允许用户进行相关的配置：全局配置、启动服务配置、日志配置、数据库连接配置、缓存配置、频率限制配置、异步和回调配置
 
 此外，还提供了配置项variables拦截预渲染能力[^ 6], 用户可以定义拦截某些配置项，并对其进行修改/更新（常用于密码解密）,然后对其他配置项的变量进行渲染替换，使用方式如下：
@@ -1345,7 +1437,7 @@ def get_password(value, origin_value):
     # 演示使用不安全的base64，请使用你认为安全的算法进行处理
     return base64.b64decode(origin_value)
 
-...
+
 ```
 
 > 为什么要在server.wsgi_server 以及 server.celery_worker代码开始位置拦截？
@@ -1354,6 +1446,7 @@ def get_password(value, origin_value):
 
 
 
+### 配置项
 
 | 路径                                   | 类型   | 描述                                                         | 默认值                                                       |
 | -------------------------------------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -1377,20 +1470,29 @@ def get_password(value, origin_value):
 | log.log_console                        | bool   | 是否将日志重定向到标准输出                                   | True                                                         |
 | log.gunicorn_access                    | string | gunicorn的access日志路径                                     | ./access.log                                                 |
 | log.gunicorn_error                     | string | gunicorn的error日志路径                                      | ./error.log                                                  |
-| log.path                               | string | 全局日志路径                                                 | ./server.log                                                 |
+| log.path                               | string | 全局日志路径，默认使用WatchedFileHandler，当指定handler时此项无效 | ./server.log                                                 |
 | log.level                              | string | 日志级别                                                     | INFO                                                         |
+| log.handler[^ 7]                       | string | 定义的Logger类，eg: logging.handlers:SysLogHandler，定义此项后会优先使用并忽略默认的log.path |                                                              |
+| log.handler_args[^ 7]                  | list   | 定义的Logger类的初始化参数，eg: []                           |                                                              |
 | log.format_string                      | string | 日志字段配置                                                 | %(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s |
 | log.date_format_string                 | string | 日志时间格式                                                 | %Y-%m-%d %H:%M:%S                                            |
 | log.loggers                            | list   | 模块独立日志配置，列表每个元素是dict: [{"name": "cms.test.api", "path": "api.log"}] |                                                              |
-| log.loggers.name                       | string | 模块名称路径，如cms.apps.test                                |                                                              |
-| log.loggers.level                      | string | 日志级别                                                     |                                                              |
-| log.loggers.path                       | string | 日志路径                                                     |                                                              |
+| log.loggers.name                       | string | 模块名称路径，如cms.apps.test，可以被重复定义使用            |                                                              |
+| log.loggers.level                      | string | 参考log.level                                                |                                                              |
+| log.loggers.path                       | string | 参考log.path                                                 |                                                              |
+| log.loggers.handler[^ 7]               | string | 参考log.handler                                              |                                                              |
+| log.loggers.handler_args[^ 7]          | list   | 参考log.handler_args                                         |                                                              |
+| log.loggers.propagate[^ 7]             | bool   | 参考log.propagate                                            |                                                              |
+| log.loggers.log_console[^ 7]           | bool   | 参考log.log_console                                          |                                                              |
+| log.loggers.format_string[^ 7]         | string | 参考log.format_string                                        |                                                              |
+| log.loggers.date_format_string[^ 7]    | string | 参考log.date_format_string                                   |                                                              |
 | db                                     | dict   | 默认数据库配置项，用户可以自行定义其他DB配置项，但需要自己初始化DBPool对象(可以参考DefaultDBPool进行单例控制) |                                                              |
 | db.connection                          | string | 连接字符串                                                   |                                                              |
 | db.pool_size                           | int    | 连接池大小                                                   | 3                                                            |
 | db.pool_recycle                        | int    | 连接最大空闲时间，超过时间后自动回收                         | 3600                                                         |
 | db.pool_timeout                        | int    | 获取连接超时时间，单位秒                                     | 5                                                            |
 | db.max_overflow                        | int    | 突发连接池扩展大小                                           | 5                                                            |
+| dbs[^ 7]                               | dict   | 额外的数据库配置项，{name: {db conf...}}，配置项会被初始化到pool.POOLS中，并以名称作为引用名，示例见进阶开发->多数据库支持 |                                                              |
 | dbcrud                                 | dict   | 数据库CRUD控制项                                             |                                                              |
 | dbcrud.unsupported_filter_as_empty     | bool   | 当遇到不支持的filter时的默认行为，1是返回空结果，2是忽略不支持的条件，由于历史版本的行为默认为2，因此其默认值为False，即忽略不支持的条件 | False                                                        |
 | cache                                  | dict   | 缓存配置项                                                   |                                                              |
@@ -1419,9 +1521,47 @@ def get_password(value, origin_value):
 
 
 
+## CHANGELOG
+
+1.3.0:
+
+- 新增：[db] 多数据库连接池配置支持(CONF.dbs)
+- 新增：[worker] 远程调用快捷模式(callback.remote(...))
+- 新增：[cache] 基于redis的分布式锁支持(cache.distributed_lock)
+- 新增：[exception] 抛出异常可携带额外数据(raise Error(exception_data=...),  e.to_dict())
+- 更新：[exception] 默认捕获所有异常，返回统一异常结构
+- 更新：[exception] 替换异常序列化to_xml库，由dicttoxml库更换为talos.core.xmlutils，提升效率，支持更多扩展
+- 更新：[template] 生成模板：requirements，wsgi_server，celery_worker
+- 更新：[base] 支持falcon 2.0
+- 更新：[log] 支持自定义handler的log配置
+- 更新：[util] 支持协程级别的GLOABLS(支持thread/gevent/eventlet类型的worker)
+- 修复：[base] 单元素的query数组错误解析为一个元素而非数组问题
+- 修复：[util] exporter对异常编码的兼容问题
+- 修复：[crud] create/update重复校验输入值
+
+1.2.3:
+
+- 优化：[config] 支持配置项变量/拦截/预渲染(常用于配置项的加解密) 
+
+1.2.2:
+
+- 优化：[util] 频率限制，支持类级/函数级频率限制，更多复杂场景 
+- 优化：[test] 完善单元测试 
+- 优化：[base] JSONB复杂查询支持 
+- 优化：[base] 一些小细节
+
+1.2.1：
+- 见 [tags](https://gitee.com/wu.jianjun/talos/tags)
+
+...
+
+
+
 [^ 1]: 本文档基于v1.1.8版本，并增加了后续版本的一些特性描述
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
 [^ 4]: v1.2.0版本增加了__fields字段选择 以及 null, notnull, nlike, nilike的查询条件 以及 relationship查询支持
 [^ 5]: v1.2.0版本新增$or,$and查询支持
 [^ 6]: v1.2.3版本后开始支持
+[^ 7]: v1.3.0版本新增多数据库连接池支持以及日志handler选项
+[^ 8]: v1.3.0版本新增了Config项加载时的warnings，以提醒用户此配置项正确访问方式

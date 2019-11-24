@@ -73,6 +73,11 @@ class Controller(object):
         def _transform_comparator(mappings, comparator):
             return mappings.get(comparator, comparator)
 
+        def none_or_empty_to_value(value, default=None):
+            if value is None or (utils.is_string_type(value) and len(value) == 0):
+                return default
+            return value
+
         query_dict = {}
         reg = re.compile(r'^(.+)\[(\d+)\]$')
         for key, value in req.params.items():
@@ -89,7 +94,7 @@ class Controller(object):
         strip_query_dict = {}
         for key, value in query_dict.items():
             if key.endswith('[]'):
-                strip_query_dict[key[:-2]] = value
+                strip_query_dict[key[:-2]] = value if utils.is_list_type(value) else [value]
             else:
                 strip_query_dict[key] = value
         query_dict = strip_query_dict
@@ -116,21 +121,24 @@ class Controller(object):
         key_fields = CONF.controller.criteria_key.fields
 
         if key_offset in query_dict:
-            offset = int(query_dict.pop(key_offset))
+            offset = int(none_or_empty_to_value(query_dict.pop(key_offset), 0))
         if key_limit in query_dict:
-            limit = int(query_dict.pop(key_limit))
+            limit = query_dict.pop(key_limit)
+            limit = None if none_or_empty_to_value(limit, None) is None else int(limit)
         if key_orders in query_dict:
-            orders = query_dict.pop(key_orders)
-            if utils.is_list_type(orders):
-                orders = [order.strip() for order in orders]
-            else:
-                orders = [orders.strip()]
+            orders = none_or_empty_to_value(query_dict.pop(key_orders))
+            if orders is not None:
+                if utils.is_list_type(orders):
+                    orders = [order.strip() for order in orders]
+                else:
+                    orders = [orders.strip()]
         if key_fields in query_dict:
-            fields = query_dict.pop(key_fields)
-            if utils.is_list_type(fields):
-                fields = [f.strip() for f in fields]
-            else:
-                fields = [fields.strip()]
+            fields = none_or_empty_to_value(query_dict.pop(key_fields))
+            if fields is not None:
+                if utils.is_list_type(fields):
+                    fields = [f.strip() for f in fields]
+                else:
+                    fields = [fields.strip()]
         for key in query_dict:
             # 没有指定支持filters 或者 明确支持的filter且完全匹配
             if supported_filters is None or key in supported_filters:

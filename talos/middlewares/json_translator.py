@@ -41,7 +41,7 @@ class JSONTranslator(object):
             raise exceptions.BodyParseError(
                 msg=_('malformed json, body was incorrect or not encoded as UTF-8.'))
 
-    def process_response(self, req, resp, resource):
+    def process_response(self, req, resp, resource, *args, **kwargs):
         """在业务逻辑之后，对每个请求返回数据格式化为json"""
         if not hasattr(resp, 'json'):
             return

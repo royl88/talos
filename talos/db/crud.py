@@ -242,8 +242,7 @@ class ColumnValidator(object):
                             data=data,
                             exception=str(e)))
                     if result is True:
-                        if not (orm_required and not col.orm_required):
-                            clean_data[field_name] = col.convert(field_value)
+                        clean_data[field_name] = col.convert(field_value)
                     else:
                         raise exceptions.ValidationError(attribute=field_name_display, msg=result)
                 else:
@@ -281,8 +280,7 @@ class ColumnValidator(object):
                             field_value = data[field]
                             break
                 if field_name is not None:
-                    if col.orm_required:
-                        clean_data[field_name] = col.convert(field_value)
+                    clean_data[field_name] = col.convert(field_value)
                 else:
                     if col.is_required(situation):
                         raise exceptions.FieldRequired(attribute=col.field)
@@ -298,6 +296,8 @@ class ResourceBase(object):
     """
     # 使用的ORM Model
     orm_meta = None
+    # DB连接池对象，若不指定，默认使用defaultPool
+    orm_pool = None
     # 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表
     _primary_keys = 'id'
     # 默认过滤查询，应用于每次查询本类资源，此处应当是静态数据，不可被更改
@@ -315,7 +315,7 @@ class ResourceBase(object):
     _validate = []
 
     def __init__(self, session=None, transaction=None, dbpool=None):
-        self._pool = dbpool or pool.POOL
+        self._pool = dbpool or self.orm_pool or pool.defaultPool
         self._session = session
         self._transaction = transaction
 
@@ -533,11 +533,13 @@ class ResourceBase(object):
         orm_meta = orm_meta or self.orm_meta
         filters = filters or {}
         # orders优先使用用户传递排序
-        if not ignore_default:
-            orders = self.default_order if orders is None else orders
-        else:
-            orders = orders or []
         orders = copy.copy(orders)
+        if orders is None:
+            orders = self.default_order
+        else:
+            if not ignore_default:
+                orders.extend(self.default_order)
+
         joins = joins or []
         ex_tables = [item['table'] for item in joins]
         tables = list(ex_tables)
@@ -809,20 +811,19 @@ class ResourceBase(object):
         """
         validate = False if not self._validate else validate
         self._before_create(resource, validate)
+        # 不校验 => orm，extra
+        # 校验=> orm, extra
+        # 为了避免重复调用校验器，因此获取一次全量字段，然后进行一次orm字段筛选即可
+        all_fields = resource
+        orm_fields = resource
         if validate:
-            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=True)
-        else:
-            orm_fields = resource
+            all_fields = self.validate(resource, utils.get_function_name(), orm_required=False, validate=True)
+            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
                 item = self.orm_meta(**orm_fields)
                 session.add(item)
                 session.flush()
-                if validate:
-                    all_fields = self.validate(resource, utils.get_function_name(),
-                                               orm_required=False, validate=True)
-                else:
-                    all_fields = resource
                 self._addtional_create(session, all_fields, item.to_dict())
                 if detail:
                     return item.to_detail_dict()
@@ -859,10 +860,14 @@ class ResourceBase(object):
         """
         validate = False if not self._validate else validate
         self._before_update(rid, resource, validate)
+        # 不校验 => orm，extra
+        # 校验=> orm, extra
+        # 为了避免重复调用校验器，因此获取一次全量字段，然后进行一次orm字段筛选即可
+        all_fields = resource
+        orm_fields = resource
         if validate:
-            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=True)
-        else:
-            orm_fields = resource
+            all_fields = self.validate(resource, utils.get_function_name(), orm_required=False, validate=True)
+            orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
                 query = self._get_query(session)
@@ -880,11 +885,6 @@ class ResourceBase(object):
                     if orm_fields:
                         record.update(orm_fields)
                     session.flush()
-                    if validate:
-                        all_fields = self.validate(resource, utils.get_function_name(),
-                                                   orm_required=False, validate=True)
-                    else:
-                        all_fields = resource
                     if detail:
                         after_update = record.to_detail_dict()
                     else:

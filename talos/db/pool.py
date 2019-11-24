@@ -83,4 +83,9 @@ class DefaultDBPool(DBPool):
     pass
 
 
-POOL = DefaultDBPool()
+defaultPool = DefaultDBPool()
+# raise_not_exist必须为False
+# 在类似异步任务场景下，不会初始化数据库连接池
+# 因此raise_not_exist=True时，任何pool.POOLS.{name}的操作都会引发AttributeError异常
+# 导致无法import api/resource相关类，但实际上这些类的定义是可以import但不使用的
+POOLS = config.Config(None, raise_not_exist=False)

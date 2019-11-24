@@ -277,7 +277,7 @@ def format_kwstring(templ, **kwargs):
     return templ % kwargs
 
 
-def ensure_unicode(value):
+def ensure_unicode(value, encoding='utf-8', errors='strict'):
     """
     确保将输入值转换为unicode字符，兼容python2、python3
 
@@ -289,16 +289,16 @@ def ensure_unicode(value):
     if not is_string_type(value):
         raise ValueError('not string type')
     if six.PY2:
-        return value.decode()
+        return value.decode(encoding, errors=errors)
     elif six.PY3:
         if isinstance(value, bytes):
-            return value.decode()
+            return value.decode(encoding, errors=errors)
         else:
             return value
     raise ValueError('can not convert to unicode')
 
 
-def ensure_bytes(value):
+def ensure_bytes(value, encoding='utf-8', errors='strict'):
     """
     确保将输入值转换为bytes/str字符，兼容python2中返回str、python3返回bytes
 
@@ -310,10 +310,10 @@ def ensure_bytes(value):
     if not is_string_type(value):
         raise ValueError('not string type')
     if six.PY2:
-        return value.encode()
+        return value.encode(encoding, errors=errors)
     elif six.PY3:
         if isinstance(value, str):
-            return value.encode()
+            return value.encode(encoding, errors=errors)
         else:
             return value
     raise ValueError('can not convert to bytes')

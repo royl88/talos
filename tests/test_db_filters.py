@@ -4,14 +4,12 @@ import pytest
 import logging
 import random
 
-from talos.server import base
 from talos.db import crud
 from talos.core import config
 from talos.core import exceptions
 
 from tests import models
 
-base.initialize_server('test', './tests/unittest.conf')
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
 
