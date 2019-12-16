@@ -14,6 +14,7 @@ import logging
 import six
 from sqlalchemy import text, and_, or_
 import sqlalchemy.exc
+from sqlalchemy.orm import lazyload, joinedload, raiseload
 
 from talos.core import config
 from talos.core import exceptions
@@ -298,6 +299,8 @@ class ResourceBase(object):
     orm_meta = None
     # DB连接池对象，若不指定，默认使用defaultPool
     orm_pool = None
+    # 是否根据Model中定义的attribute自动改变load策略
+    _dynamic_load = None
     # 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表
     _primary_keys = 'id'
     # 默认过滤查询，应用于每次查询本类资源，此处应当是静态数据，不可被更改
@@ -314,8 +317,15 @@ class ResourceBase(object):
     # converter，对象实例，converter中的类型，可以自定义
     _validate = []
 
-    def __init__(self, session=None, transaction=None, dbpool=None):
+    def __init__(self, session=None, transaction=None, dbpool=None, dynamic_load=None):
+        def _first_not_none(vals):
+            for v in vals:
+                if v is not None:
+                    return v
+
         self._pool = dbpool or self.orm_pool or pool.defaultPool
+        load_strategies = [dynamic_load, self._dynamic_load, CONF.dbcrud.dynamic_load, True]
+        self._dynamic_load = _first_not_none(load_strategies)
         self._session = session
         self._transaction = transaction
 
@@ -512,6 +522,62 @@ class ResourceBase(object):
             query = query.filter(text('1!=1'))
         return query
 
+    def _dynamic_query_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True):
+        '''
+        将query中所有的relationship加载方式更改为动态加载，
+        在数据库依赖层级比较深或相互依赖时可提升效率
+        
+        :param query: SQL查询对象
+        :type query: sqlalchemy.query
+        :param orm_meta: models类，若不指定，则为当前类的orm_meta
+        :type orm_meta: model
+        :param level: 初始对象属性层级，3：detail及，2：list级，1：summary级
+        :type level: int
+        :param parent: 父级load对象
+        :type parent: loadstrategy
+        :param fallback_raise: 没有在attributes中指定时，默认使用raiseload，False则使用lazyload
+        :type fallback_raise: bool
+        '''
+        level = max(level, 1)
+        orm_meta = orm_meta or self.orm_meta
+        relationship_cols = orm_meta().list_relationship_columns()
+        level_map = {
+            3: ('detail_attributes', 'get_columns'),
+            2: ('attributes', 'list_columns'),
+            1: ('summary_attributes', 'sum_columns')}
+        attributes = getattr(orm_meta, level_map[level][0], [])
+        attributes = attributes or getattr(orm_meta(), level_map[level][1], None)()
+        if relationship_cols:
+            for rel_col_name in relationship_cols:
+                col = getattr(orm_meta, rel_col_name)
+                if rel_col_name in attributes:
+                    print('joined load: %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key))
+                    parent_next = None
+                    if parent:
+                        parent_next = parent.joinedload(col)
+                        query = query.options(parent_next)
+                    else:
+                        parent_next = joinedload(col)
+                        query = query.options(parent_next)
+                    query = self._dynamic_query_load(query,
+                                                     orm_meta=col.prop.entity.entity,
+                                                     level=level - 1,
+                                                     parent=parent_next,
+                                                     fallback_raise=fallback_raise)
+                else:
+                    print('raise load:  %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key))
+                    if parent:
+                        if fallback_raise:
+                            query = query.options(parent.raiseload(col))
+                        else:
+                            query = query.options(parent.lazyload(col))
+                    else:
+                        if fallback_raise:
+                            query = query.options(raiseload(col))
+                        else:
+                            query = query.options(lazyload(col))
+        return query
+
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
         """获取一个query对象，这个对象已经应用了filter，可以确保查询的数据只包含我们感兴趣的数据，常用于过滤已被删除的数据
 
@@ -561,6 +627,8 @@ class ResourceBase(object):
         # 如果不是忽略default模式，default_filter必须进行过滤
         if not ignore_default:
             query = self._apply_filters(query, orm_meta, self.default_filter)
+        if self._dynamic_load:
+            query = self._dynamic_query_load(query)
         return query
 
     def _apply_primary_key_filter(self, query, rid):

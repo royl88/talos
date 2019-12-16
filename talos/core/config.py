@@ -286,7 +286,8 @@ CONFIG_OPTS = {
     'dbs': {
     },
     'dbcrud': {
-        'unsupported_filter_as_empty': False
+        'unsupported_filter_as_empty': False,
+        'dynamic_load': True,
     },
     'cache': {
         'type': 'dogpile.cache.memory',
