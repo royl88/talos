@@ -170,7 +170,125 @@ class UserPhoneNum(Base, DictBase):
     description = Column(String(255), nullable=True)
 ```
 
-继承了这个类之后，不仅提供了转换接口json的能力，还提供了字段提取的能力，此项稍后再说明，此处不定义，则意味着默认使用表的所有字段
+继承了这个类之后，不仅提供了转换接口json的能力，还提供了字段提取的能力，此项稍后再说明，此处不定义，则意味着默认使用表的所有字段（list和被外键引用时默认不包含外键字段），如果需要自定义字段，可以在类中配置字段提取：
+
+```python
+class User(Base, DictBase):
+    __tablename__ = 'user'
+    # 用于控制获取列表时字段返回
+    attributes = ['id', 'name']
+    # 用于控制获取详情时字段返回
+    detail_attributes = attributes
+    # 用于控制被其他资源外键引用时字段返回
+    summary_attributes = ['name']
+    
+    id = Column(String(36), primary_key=True)
+    name = Column(String(63), nullable=False)
+```
+**指定attributes/detail_attributes/summary_attributes是非常有效的字段返回控制手段，减少返回的信息，可以减少服务器传输的压力，不仅如此，如果此处有外键relationship时，指定各attributes属性还可以有效的控制数据库对于外键的查询效率**[^ 9]
+
+> 扩展阅读：
+>
+> 一个较为常见的场景，某系统设计有数据库表如下：
+>
+> User -> PhoneNum/Addresses, 一个用户对应多个电话号码以及多个地址
+>
+> Tag，标签表，一个资源可对应多个标签
+>
+> Region -> Tag，地域表，一个地域有多个标签
+>
+> Resource -> Region/Tag，资源表，一个资源属于一个地域，一个资源有多个标签
+>
+> 用models表示大致如下：
+>
+> ```
+> class Address(Base, DictBase):
+>     __tablename__ = 'address'
+>     attributes = ['id', 'location', 'user_id']
+>     detail_attributes = attributes
+>     summary_attributes = ['location']
+> 
+>     id = Column(String(36), primary_key=True)
+>     location = Column(String(255), nullable=False)
+>     user_id = Column(ForeignKey(u'user.id'), nullable=False)
+> 
+>     user = relationship(u'User')
+>     
+> class PhoneNum(Base, DictBase):
+>     __tablename__ = 'phone'
+>     attributes = ['id', 'number', 'user_id']
+>     detail_attributes = attributes
+>     summary_attributes = ['number']
+> 
+>     id = Column(String(36), primary_key=True)
+>     number = Column(String(255), nullable=False)
+>     user_id = Column(ForeignKey(u'user.id'), nullable=False)
+> 
+>     user = relationship(u'User')
+>     
+> class User(Base, DictBase):
+>     __tablename__ = 'user'
+>     attributes = ['id', 'name', 'addresses', 'phonenums']
+>     detail_attributes = attributes
+>     summary_attributes = ['name']
+> 
+>     id = Column(String(36), primary_key=True)
+>     name = Column(String(255), nullable=False)
+>     
+>     addresses = relationship(u'Address', back_populates=u'user', lazy=False, uselist=True, viewonly=True)
+>     phonenums = relationship(u'PhoneNum', back_populates=u'user', lazy=False, uselist=True, viewonly=True)
+>     
+> class Tag(Base, DictBase):
+>     __tablename__ = 'tag'
+>     attributes = ['id', 'res_id', 'key', 'value']
+>     detail_attributes = attributes
+>     summary_attributes = ['key', 'value']
+> 
+>     id = Column(String(36), primary_key=True)
+>     res_id = Column(String(36), nullable=False)
+>     key = Column(String(36), nullable=False)
+>     value = Column(String(36), nullable=False)
+> 
+> class Region(Base, DictBase):
+>     __tablename__ = 'region'
+>     attributes = ['id', 'name', 'desc', 'tags', 'user_id', 'user']
+>     detail_attributes = attributes
+>     summary_attributes = ['name', 'desc']
+> 
+>     id = Column(String(36), primary_key=True)
+>     name = Column(String(255), nullable=False)
+>     desc = Column(String(255), nullable=True)
+>     user_id = Column(ForeignKey(u'user.id'), nullable=True)
+>     user = relationship(u'User')
+> 
+>     tags = relationship(u'Tag', primaryjoin='foreign(Region.id) == Tag.res_id',
+>         lazy=False, viewonly=True, uselist=True)
+> 
+> class Resource(Base, DictBase):
+>     __tablename__ = 'resource'
+>     attributes = ['id', 'name', 'desc', 'tags', 'user_id', 'user', 'region_id', 'region']
+>     detail_attributes = attributes
+>     summary_attributes = ['name', 'desc']
+> 
+>     id = Column(String(36), primary_key=True)
+>     name = Column(String(255), nullable=False)
+>     desc = Column(String(255), nullable=True)
+>     user_id = Column(ForeignKey(u'user.id'), nullable=True)
+>     region_id = Column(ForeignKey(u'region.id'), nullable=True)
+>     user = relationship(u'User')
+>     region = relationship(u'region')
+> 
+>     tags = relationship(u'Tag', primaryjoin='foreign(Resource.id) == Tag.res_id',
+>         lazy=False, viewonly=True, uselist=True)
+> ```
+>
+> 如上，user作为最底层的资源，被region引用，而region又被resource使用，导致层级嵌套极多，在SQLAlchmey中，如果希望快速查询一个列表资源，一般而言我们会在relationship中加上lazy=False，这样就可以让信息在一次sql查询中加载出来，而不是每次访问外键属性再发起一次查询。问题出现在，lazy=False时sql被组合为一个SQL语句，relationship嵌套会被展开，实际数据库查询结果将是乘数级：num_resource\*num_resource_user\*num_resource_user_address\*num_resource_user_phonenum\*num_region\*num_region_user_address\*num_region_user_phonenum...
+>
+> 导致本来resource表只有1k数量级，而本次查询结果却可能是1000 \* 1k级
+>
+> 通常我们加载resource时，我们并不需要region.user、region.tags、user.addresses、user.phonenums等信息，通过指定summary_attributes来防止数据过载（需要启用CONF.dbcrud.dynamic_relationship，默认启用），这样我们得到的SQL查询是非常快速的，结果集也保持和resource一个数量级
+
+
 
 #### 增删改查的资源类
 
@@ -1402,8 +1520,8 @@ talos提供了一个类字典的属性访问配置类
    保留函数名如下：set_options，from_files，iterkeys，itervalues，iteritems，keys，values，items，get，to_dict，_opts，python魔法函数
 
 比如{
-        "my_config": {"from_files": {"a": {"b": False}}}
-    }
+​        "my_config": {"from_files": {"a": {"b": False}}}
+​    }
 无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取，talos会在项目启动时给予提示，请您关注[^8]
 
 ### 预渲染项
@@ -1495,6 +1613,8 @@ def get_password(value, origin_value):
 | dbs[^ 7]                               | dict   | 额外的数据库配置项，{name: {db conf...}}，配置项会被初始化到pool.POOLS中，并以名称作为引用名，示例见进阶开发->多数据库支持 |                                                              |
 | dbcrud                                 | dict   | 数据库CRUD控制项                                             |                                                              |
 | dbcrud.unsupported_filter_as_empty     | bool   | 当遇到不支持的filter时的默认行为，1是返回空结果，2是忽略不支持的条件，由于历史版本的行为默认为2，因此其默认值为False，即忽略不支持的条件 | False                                                        |
+| dbcrud.dynamic_relationship            | bool   | 是否启用ORM的动态relationship加载技术，启用后可以通过models.attributes来控制外键动态加载，避免数据过载导致查询缓慢 | True                                                         |
+| dbcrud.detail_relationship_as_summary  | bool   | 控制获取详情时，下级relationship是列表级或摘要级，False为列表级，True为摘要级，默认False | False                                                        |
 | cache                                  | dict   | 缓存配置项                                                   |                                                              |
 | cache.type                             | string | 缓存后端类型                                                 | dogpile.cache.memory                                         |
 | cache.expiration_time                  | int    | 缓存默认超时时间，单位为秒                                   | 3600                                                         |
@@ -1522,6 +1642,11 @@ def get_password(value, origin_value):
 
 
 ## CHANGELOG
+
+1.3.1:
+
+- 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship)
+- 更新：[db] 支持设定获取资源detail级时下级relationship指定列表级 / 摘要级(CONF.dbcrud.detail_relationship_as_summary)
 
 1.3.0:
 
@@ -1565,3 +1690,4 @@ def get_password(value, origin_value):
 [^ 6]: v1.2.3版本后开始支持
 [^ 7]: v1.3.0版本新增多数据库连接池支持以及日志handler选项
 [^ 8]: v1.3.0版本新增了Config项加载时的warnings，以提醒用户此配置项正确访问方式
+[^ 9]: v1.3.1版本更新了relationship的动态加载技术，可根据设定的attributes自动加速查询(默认启用)
