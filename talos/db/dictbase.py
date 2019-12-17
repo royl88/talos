@@ -22,10 +22,18 @@ class DictBase(object):
         for key, value in dict(object_mapper(self).columns).items():
             yield (key, value)
 
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
+
     def __getitem__(self, key):
         return getattr(self, key)
 
-    def iter_columns(self):
+    def update(self, values):
+        """更新Model属性，模仿dict行为."""
+        for k, v in six.iteritems(values):
+            setattr(self, k, v)
+
+    def all_columns_as_dict(self):
         columns = dict(object_mapper(self).columns)
         columns.update(dict(object_mapper(self).relationships))
         return columns
@@ -36,14 +44,14 @@ class DictBase(object):
 
     def get_columns(self):
         """默认get级别的详细属性列表，即自身作为主资源且尽量详细时的属性值，默认带有relationship"""
-        return self.detail_attributes or self.iter_columns().keys()
+        return self.detail_attributes or self.all_columns_as_dict().keys()
 
     def sum_columns(self):
         """默认summary级别的属性列表，即被其他资源引用时能展示的属性值，默认不带有relationship"""
         return self.summary_attributes or [key for key, value in self]
 
     def list_relationship_columns(self):
-        return [k for k, v in self.iter_columns().items() if isinstance(v, RelationshipProperty)]
+        return [k for k, v in self.all_columns_as_dict().items() if isinstance(v, RelationshipProperty)]
 
     def _convert_flat_dict(self, data, prefix=None, separator='.'):
         flat_data = {}
@@ -105,7 +113,7 @@ class DictBase(object):
                 d[attr] = value
         return d
 
-    def to_detail_dict(self, prefix=None, flat_dict=False):
+    def to_detail_dict(self, prefix=None, flat_dict=False, child_as_summary=False):
         """
         将自身Model的get级别的列:值转换为dict类型返回
 
@@ -120,7 +128,10 @@ class DictBase(object):
         for attr in self.get_columns():
             value = getattr(self, attr)
             if isinstance(value, DictBase):  # sqlalchemy.orm.collections.InstrumentedList
-                value = value.to_dict(flat_dict=flat_dict)
+                if child_as_summary:
+                    value = value.to_summary_dict(flat_dict=flat_dict)
+                else:
+                    value = value.to_dict(flat_dict=flat_dict)
                 if flat_dict:
                     if prefix and prefix.strip():
                         d.update(
@@ -134,7 +145,10 @@ class DictBase(object):
                     if isinstance(value[0], DictBase):
                         values = []
                         for v in value:
-                            values.append(v.to_dict(flat_dict=flat_dict))
+                            if child_as_summary:
+                                values.append(v.to_summary_dict(flat_dict=flat_dict))
+                            else:
+                                values.append(v.to_dict(flat_dict=flat_dict))
                         value = values
                 else:
                     value = []

@@ -287,7 +287,8 @@ CONFIG_OPTS = {
     },
     'dbcrud': {
         'unsupported_filter_as_empty': False,
-        'dynamic_load': True,
+        'dynamic_relationship': True,
+        'detail_relationship_as_summary': False,
     },
     'cache': {
         'type': 'dogpile.cache.memory',

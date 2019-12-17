@@ -300,7 +300,10 @@ class ResourceBase(object):
     # DB连接池对象，若不指定，默认使用defaultPool
     orm_pool = None
     # 是否根据Model中定义的attribute自动改变load策略
-    _dynamic_load = None
+    _dynamic_relationship = None
+    # get获取信息时，默认根据detail->list->summary层级依次进行取值(取决于全局配置)
+    # 如果希望本资源get获取到的第一层级外键是summary级，则设置为True
+    _detail_relationship_as_summary = None
     # 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表
     _primary_keys = 'id'
     # 默认过滤查询，应用于每次查询本类资源，此处应当是静态数据，不可被更改
@@ -317,15 +320,16 @@ class ResourceBase(object):
     # converter，对象实例，converter中的类型，可以自定义
     _validate = []
 
-    def __init__(self, session=None, transaction=None, dbpool=None, dynamic_load=None):
+    def __init__(self, session=None, transaction=None, dbpool=None, dynamic_relationship=None):
         def _first_not_none(vals):
             for v in vals:
                 if v is not None:
                     return v
 
         self._pool = dbpool or self.orm_pool or pool.defaultPool
-        load_strategies = [dynamic_load, self._dynamic_load, CONF.dbcrud.dynamic_load, True]
-        self._dynamic_load = _first_not_none(load_strategies)
+        load_strategies = [dynamic_relationship, self._dynamic_relationship, CONF.dbcrud.dynamic_relationship]
+        self._dynamic_relationship = _first_not_none(load_strategies)
+        self._detail_relationship_as_summary = CONF.dbcrud.detail_relationship_as_summary if self._detail_relationship_as_summary is None else self._detail_relationship_as_summary
         self._session = session
         self._transaction = transaction
 
@@ -522,7 +526,7 @@ class ResourceBase(object):
             query = query.filter(text('1!=1'))
         return query
 
-    def _dynamic_query_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True):
+    def _dynamic_relationship_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True):
         '''
         将query中所有的relationship加载方式更改为动态加载，
         在数据库依赖层级比较深或相互依赖时可提升效率
@@ -542,16 +546,21 @@ class ResourceBase(object):
         orm_meta = orm_meta or self.orm_meta
         relationship_cols = orm_meta().list_relationship_columns()
         level_map = {
-            3: ('detail_attributes', 'get_columns'),
-            2: ('attributes', 'list_columns'),
-            1: ('summary_attributes', 'sum_columns')}
-        attributes = getattr(orm_meta, level_map[level][0], [])
-        attributes = attributes or getattr(orm_meta(), level_map[level][1], None)()
+            3: 'get_columns',
+            2: 'list_columns',
+            1: 'sum_columns'}
+        attributes = getattr(orm_meta(), level_map[level], None)()
         if relationship_cols:
             for rel_col_name in relationship_cols:
                 col = getattr(orm_meta, rel_col_name)
                 if rel_col_name in attributes:
-                    print('joined load: %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key))
+                    # FIXME: (wujj)remove this, debug msg
+                    load_msg = 'dynamic relationship joined load: '
+                    if parent:
+                        for p in parent.path:
+                            load_msg += '[%s.%s]' % (p.parent.mapper.tables[0], p.property.key)
+                    load_msg += ' %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key)
+                    LOG.debug(load_msg)
                     parent_next = None
                     if parent:
                         parent_next = parent.joinedload(col)
@@ -559,13 +568,24 @@ class ResourceBase(object):
                     else:
                         parent_next = joinedload(col)
                         query = query.options(parent_next)
-                    query = self._dynamic_query_load(query,
-                                                     orm_meta=col.prop.entity.entity,
-                                                     level=level - 1,
+                    # 当要按照detail级取信息时，需要根据用户指定的detail_relationship_as_summary信息进行动态判定
+                    if level == 3 and parent is None and self._detail_relationship_as_summary:
+                        next_level = 1
+                    else:
+                        next_level = level - 1
+                    query = self._dynamic_relationship_load(query,
+                                                     orm_meta=col.property.entity.entity,
+                                                     level=next_level,
                                                      parent=parent_next,
                                                      fallback_raise=fallback_raise)
                 else:
-                    print('raise load:  %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key))
+                    # FIXME: (wujj)remove this, debug msg
+                    load_msg = 'dynamic relationship raised load: '
+                    if parent:
+                        for p in parent.path:
+                            load_msg += '[%s.%s]' % (p.parent.mapper.tables[0], p.property.key)
+                    load_msg += ' %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key)
+                    LOG.debug(load_msg)
                     if parent:
                         if fallback_raise:
                             query = query.options(parent.raiseload(col))
@@ -578,7 +598,8 @@ class ResourceBase(object):
                             query = query.options(lazyload(col))
         return query
 
-    def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
+    def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False,
+                   dynamic_relationship=None, init_relationship_level=2):
         """获取一个query对象，这个对象已经应用了filter，可以确保查询的数据只包含我们感兴趣的数据，常用于过滤已被删除的数据
 
         :param session: session对象
@@ -592,6 +613,8 @@ class ResourceBase(object):
         :type orders: list
         :param joins: 指定动态join,eg.[{'table': model, 'conditions': [model_a.col_1 == model_b.col_1]}]
         :type joins: list
+        :param dynamic_relationship: 是否使用动态外键加载方式，None代表依次使用实例指定/类指定/配置指定
+        :type dynamic_relationship: bool/None
         :returns: query对象
         :rtype: query
         :raises: ValueError
@@ -627,8 +650,9 @@ class ResourceBase(object):
         # 如果不是忽略default模式，default_filter必须进行过滤
         if not ignore_default:
             query = self._apply_filters(query, orm_meta, self.default_filter)
-        if self._dynamic_load:
-            query = self._dynamic_query_load(query)
+        do_dynamic_relationship = self._dynamic_relationship if dynamic_relationship is None else dynamic_relationship
+        if do_dynamic_relationship:
+            query = self._dynamic_relationship_load(query, level=init_relationship_level)
         return query
 
     def _apply_primary_key_filter(self, query, rid):
@@ -796,7 +820,8 @@ class ResourceBase(object):
         """
         offset = offset or 0
         with self.get_session() as session:
-            query = self._get_query(session, filters=filters, orders=[])
+            query = self._get_query(session, filters=filters, orders=[],
+                                    dynamic_relationship=False)
             if hooks:
                 for h in hooks:
                     query = h(query, filters)
@@ -851,11 +876,11 @@ class ResourceBase(object):
         :rtype: dict
         """
         with self.get_session() as session:
-            query = self._get_query(session)
+            query = self._get_query(session, init_relationship_level=3)
             query = self._apply_primary_key_filter(query, rid)
             query = query.one_or_none()
             if query:
-                result = query.to_detail_dict()
+                result = query.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                 return result
             else:
                 return None
@@ -894,7 +919,7 @@ class ResourceBase(object):
                 session.flush()
                 self._addtional_create(session, all_fields, item.to_dict())
                 if detail:
-                    return item.to_detail_dict()
+                    return item.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                 else:
                     return item.to_dict()
             except sqlalchemy.exc.IntegrityError as e:
@@ -938,7 +963,10 @@ class ResourceBase(object):
             orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
-                query = self._get_query(session)
+                if detail:
+                    query = self._get_query(session, init_relationship_level=3)
+                else:
+                    query = self._get_query(session)
                 query = self._apply_primary_key_filter(query, rid)
                 if filters:
                     query = self._apply_filters(query, self.orm_meta, filters)
@@ -947,14 +975,14 @@ class ResourceBase(object):
                 after_update = None
                 if record is not None:
                     if detail:
-                        before_update = record.to_detail_dict()
+                        before_update = record.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                     else:
                         before_update = record.to_dict()
                     if orm_fields:
                         record.update(orm_fields)
                     session.flush()
                     if detail:
-                        after_update = record.to_detail_dict()
+                        after_update = record.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                     else:
                         after_update = record.to_dict()
                     self._addtional_update(session, rid, all_fields, before_update, after_update)
@@ -975,7 +1003,7 @@ class ResourceBase(object):
     def _addtional_delete(self, session, resource):
         pass
 
-    def delete(self, rid, filters=None):
+    def delete(self, rid, filters=None, detail=True):
         """
         删除资源
 
@@ -987,7 +1015,10 @@ class ResourceBase(object):
         self._before_delete(rid)
         with self.transaction() as session:
             try:
-                query = self._get_query(session, orders=[])
+                if detail:
+                    query = self._get_query(session, orders=[], init_relationship_level=3)
+                else:
+                    query = self._get_query(session, orders=[])
                 query = self._apply_primary_key_filter(query, rid)
                 if filters:
                     query = self._apply_filters(query, self.orm_meta, filters)
@@ -995,7 +1026,10 @@ class ResourceBase(object):
                 resource = None
                 count = 0
                 if record is not None:
-                    resource = record.to_dict()
+                    if detail:
+                        resource = record.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
+                    else:
+                        resource = record.to_dict()
                 count = query.delete(synchronize_session=False)
                 session.flush()
                 self._addtional_delete(session, resource)
