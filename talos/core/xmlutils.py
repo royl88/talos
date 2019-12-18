@@ -17,7 +17,6 @@ print 'cost:', end - start
 > cost: 0.0019998550415
 
 """
-from __builtin__ import isinstance
 import collections
 import datetime
 import decimal

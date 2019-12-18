@@ -25,9 +25,10 @@ class _Base(crud.ResourceBase):
                                                                                        'value': value})
         return crud.ResourceBase._unsupported_filter(self, query, idx, name, op, value)
 
-    def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False):
+    def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False, **kwargs):
         query = crud.ResourceBase._get_query(self, session, orm_meta=orm_meta,
-                                             filters=filters, orders=orders, joins=joins, ignore_default=ignore_default)
+                                             filters=filters, orders=orders, joins=joins, ignore_default=ignore_default,
+                                             **kwargs)
         LOG.error('#############################get query#####################################')
         LOG.error('%s' % query)
         return query
@@ -68,6 +69,46 @@ class _Address(_Base):
     '''
 
     orm_meta = models.Address
+
+
+class _Business(_Base):
+    '''
+    id    name    owner_dep_id    create_user_id
+    1     bus1    1               1
+    '''
+
+    orm_meta = models.Business
+
+    def get_list_query(self, filters=None, orders=None, offset=None, limit=None, hooks=None):
+        offset = offset or 0
+        with self.get_session() as session:
+            query = self._get_query(session, filters=filters, orders=orders)
+            if hooks:
+                for h in hooks:
+                    query = h(query, filters)
+
+            query = self._addtional_list(query, filters)
+            if offset:
+                query = query.offset(offset)
+            if limit is not None:
+                query = query.limit(limit)
+            return query
+
+    def get_detail_query(self, rid):
+        with self.get_session() as session:
+            query = self._get_query(session, level_of_relationship=3)
+            query = self._apply_primary_key_filter(query, rid)
+            return query
+
+
+class _BusinessDetailSum(_Business):
+    '''
+    id    name    owner_dep_id    create_user_id
+    1     bus1    1               1
+    '''
+
+    orm_meta = models.Business
+    _detail_relationship_as_summary = True
 
 
 def test_orders():
@@ -251,3 +292,15 @@ def test_unsupported_filter():
     else:
         assert len(users) == 1
         assert users[0]['id'] == '4'
+
+
+def test_dynamic_relationship():
+    bs_query = _Business().get_list_query()
+    assert 'address' not in str(bs_query)
+    bs_query = _Business().get_detail_query('1')
+    assert 'address' in str(bs_query)
+
+    bs_query = _BusinessDetailSum().get_list_query()
+    assert 'address' not in str(bs_query)
+    bs_query = _BusinessDetailSum().get_detail_query('1')
+    assert 'address' not in str(bs_query)

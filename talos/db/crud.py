@@ -599,7 +599,7 @@ class ResourceBase(object):
         return query
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False,
-                   dynamic_relationship=None, init_relationship_level=2):
+                   dynamic_relationship=None, level_of_relationship=2):
         """获取一个query对象，这个对象已经应用了filter，可以确保查询的数据只包含我们感兴趣的数据，常用于过滤已被删除的数据
 
         :param session: session对象
@@ -613,8 +613,12 @@ class ResourceBase(object):
         :type orders: list
         :param joins: 指定动态join,eg.[{'table': model, 'conditions': [model_a.col_1 == model_b.col_1]}]
         :type joins: list
+        :param ignore_default: 是否忽略默认的类指定的filters及orders
+        :type ignore_default: list
         :param dynamic_relationship: 是否使用动态外键加载方式，None代表依次使用实例指定/类指定/配置指定
         :type dynamic_relationship: bool/None
+        :param level_of_relationship: 初始加载的字段级别，1:summary, 2: list, 3: detail
+        :type level_of_relationship: int[1,2,3]
         :returns: query对象
         :rtype: query
         :raises: ValueError
@@ -652,7 +656,7 @@ class ResourceBase(object):
             query = self._apply_filters(query, orm_meta, self.default_filter)
         do_dynamic_relationship = self._dynamic_relationship if dynamic_relationship is None else dynamic_relationship
         if do_dynamic_relationship:
-            query = self._dynamic_relationship_load(query, level=init_relationship_level)
+            query = self._dynamic_relationship_load(query, level=level_of_relationship)
         return query
 
     def _apply_primary_key_filter(self, query, rid):
@@ -876,7 +880,7 @@ class ResourceBase(object):
         :rtype: dict
         """
         with self.get_session() as session:
-            query = self._get_query(session, init_relationship_level=3)
+            query = self._get_query(session, level_of_relationship=3)
             query = self._apply_primary_key_filter(query, rid)
             query = query.one_or_none()
             if query:
@@ -964,7 +968,7 @@ class ResourceBase(object):
         with self.transaction() as session:
             try:
                 if detail:
-                    query = self._get_query(session, init_relationship_level=3)
+                    query = self._get_query(session, level_of_relationship=3)
                 else:
                     query = self._get_query(session)
                 query = self._apply_primary_key_filter(query, rid)
@@ -1016,7 +1020,7 @@ class ResourceBase(object):
         with self.transaction() as session:
             try:
                 if detail:
-                    query = self._get_query(session, orders=[], init_relationship_level=3)
+                    query = self._get_query(session, orders=[], level_of_relationship=3)
                 else:
                     query = self._get_query(session, orders=[])
                 query = self._apply_primary_key_filter(query, rid)
