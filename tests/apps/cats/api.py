@@ -35,3 +35,7 @@ class User(crud.ResourceBase):
         crud.ColumnValidator(field='age', rule=validator.NumberValidator(
             range_min=1, range_max=200), validate_on=['create:O', 'update:O'], nullable=True),
     ]
+
+    def _addtional_list(self, query, filters):
+        LOG.info(str(query))
+        return crud.ResourceBase._addtional_list(self, query, filters)

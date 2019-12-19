@@ -1,4 +1,4 @@
-talos project[^1]
+talos project[^ 1]
 =======================
 
 [TOC]
@@ -185,7 +185,7 @@ class User(Base, DictBase):
     id = Column(String(36), primary_key=True)
     name = Column(String(63), nullable=False)
 ```
-**指定attributes/detail_attributes/summary_attributes是非常有效的字段返回控制手段，减少返回的信息，可以减少服务器传输的压力，不仅如此，如果此处有外键relationship时，指定各attributes属性还可以有效的控制数据库对于外键的查询效率**[^ 9]
+**指定attributes/detail_attributes/summary_attributes是非常有效的字段返回控制手段，减少返回的信息，可以减少服务器传输的压力，不仅如此，如果此处有外键relationship时，指定各attributes属性还可以有效的控制数据库对于外键的查询效率** [^ 9]
 
 > 扩展阅读：
 >
@@ -1522,7 +1522,7 @@ talos提供了一个类字典的属性访问配置类
 比如{
 ​        "my_config": {"from_files": {"a": {"b": False}}}
 ​    }
-无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取，talos会在项目启动时给予提示，请您关注[^8]
+无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取，talos会在项目启动时给予提示，请您关注[^ 8]
 
 ### 预渲染项
 

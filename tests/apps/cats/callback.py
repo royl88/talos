@@ -21,3 +21,8 @@ def add(data, x, y):
 def timeout(data):
     time.sleep(2)
     return data
+
+
+@async_helper.callback('/callback/limithosts', name='callback.limithosts')
+def limithosts(data):
+    return data
