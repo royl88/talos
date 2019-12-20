@@ -142,7 +142,7 @@ def toxml(obj, root_tag='root', attr_type=True, hooks=None, list_item_tag='item'
         if attr_type:
             element.attrib['type'] = 'dict'
         for k, v in obj.items():
-            sub_element = et.SubElement(element, k)
+            sub_element = et.SubElement(element, default_render(k))
             if is_dict(v):
                 _dict_to_etree(sub_element, v, attr_type)
             elif is_list(v):
@@ -158,7 +158,7 @@ def toxml(obj, root_tag='root', attr_type=True, hooks=None, list_item_tag='item'
             if is_dict(v):
                 _dict_to_etree(sub_element, v, attr_type)
             elif is_list(v):
-                _list_to_etree(sub_element, v, attr_type, tag=list_item_tag)
+                _list_to_etree(sub_element, v, attr_type)
             else:
                 _normal_to_etree(sub_element, v, attr_type)
 
@@ -175,4 +175,4 @@ def toxml(obj, root_tag='root', attr_type=True, hooks=None, list_item_tag='item'
         _list_to_etree(root, obj, attr_type)
     else:
         _normal_to_etree(root, obj, attr_type)
-    return '<?xml version="1.0" encoding="UTF-8" ?>' + et.tostring(root, 'utf-8')
+    return u'<?xml version="1.0" encoding="UTF-8" ?>'.encode('utf-8') + et.tostring(root, 'utf-8')

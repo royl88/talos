@@ -289,7 +289,10 @@ def ensure_unicode(value, encoding='utf-8', errors='strict'):
     if not is_string_type(value):
         raise ValueError('not string type')
     if six.PY2:
-        return value.decode(encoding, errors=errors)
+        if not isinstance(value, unicode):
+            return value.decode(encoding, errors=errors)
+        else:
+            return value
     elif six.PY3:
         if isinstance(value, bytes):
             return value.decode(encoding, errors=errors)
@@ -310,7 +313,10 @@ def ensure_bytes(value, encoding='utf-8', errors='strict'):
     if not is_string_type(value):
         raise ValueError('not string type')
     if six.PY2:
-        return value.encode(encoding, errors=errors)
+        if isinstance(value, unicode):
+            return value.encode(encoding, errors=errors)
+        else:
+            return value
     elif six.PY3:
         if isinstance(value, str):
             return value.encode(encoding, errors=errors)
