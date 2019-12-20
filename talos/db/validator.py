@@ -145,7 +145,7 @@ class NumberValidator(NullValidator):
     def validate(self, value):
         if not utils.is_number_type(value):
             return _('need number input, not %(type)s') % {'type': type(value).__name__}
-        if isinstance(value, self._types):
+        if (self._types and isinstance(value, self._types)) or (not self._types):
             if self._range_min is not None and self._range_min > value:
                 return _('number range min required, %(min)d <= value') % {'min': self._range_min}
             if self._range_max is not None and self._range_max < value:
