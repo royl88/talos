@@ -1,20 +1,18 @@
 # coding=utf-8
 
 import logging
-import pytest
 import requests
 import threading as concurrent
 from wsgiref.simple_server import make_server
 
 from talos.core import config
-from talos.db import crud
 
 from tests import API
 
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
-
+WAIT_TIMEOUT = 10
 
 
 def _server_proc(l):
@@ -44,7 +42,7 @@ def test_list_user():
         resp = requests.get('http://127.0.0.1:9000/v1/users')
         result = resp.json()
         assert result['count'] >= 0
-    p.join()
+    p.join(WAIT_TIMEOUT)
 
 
 def test_list_user_params():
@@ -60,7 +58,7 @@ def test_list_user_params():
         assert result['count'] == 1
         assert result['data'][0]['id'] == '1'
         assert 'name' not in result['data'][0]
-    p.join()
+    p.join(WAIT_TIMEOUT)
 
 
 def test_get_user():
@@ -71,23 +69,36 @@ def test_get_user():
         resp = requests.get('http://127.0.0.1:9000/v1/users/1')
         result = resp.json()
         assert result['id'] == '1'
-    p.join()
+    p.join(WAIT_TIMEOUT)
+
+
+def test_create_user():
+    from tests.apps.cats import api
+    result = api.User().create({'id': '9999',
+                       'name': 'talos',
+                       'age': 1,
+                       'department_id': '1'})
+    assert result['id'] == '9999'
+    
+    result = api.User().update('9999', {'age': 2})
+    assert result[0]['age'] == 1 and result[1]['age'] == 2
+
+    result = api.User().delete('9999')
+    assert result[0] == 1 and result[1][0]['id'] == '9999'
 
 
 def test_method_not_allow():
     l = concurrent.Lock()
     p = start_server(l)
-
     with l:
         resp = requests.patch('http://127.0.0.1:9000/v1/users')
         assert resp.status_code == 405
-    p.join()
+    p.join(WAIT_TIMEOUT)
 
 
 def test_list_user_only_ilike():
     l = concurrent.Lock()
     p = start_server(l)
-
     with l:
         resp = requests.get('http://127.0.0.1:9000/v1/limitedusers', params={'__limit': 1,
                                                                       '__orders': 'id',
@@ -95,11 +106,9 @@ def test_list_user_only_ilike():
                                                                       '__fields': 'id'})
         result = resp.json()
         assert result['count'] > 1
-    p.join()
+    p.join(WAIT_TIMEOUT)
 
-    l = concurrent.Lock()
     p = start_server(l)
-
     with l:
         resp = requests.get('http://127.0.0.1:9000/v1/limitedusers', params={'__limit': 1,
                                                                       '__orders': 'id',
@@ -107,4 +116,4 @@ def test_list_user_only_ilike():
                                                                       '__fields': 'id'})
         result = resp.json()
         assert result['count'] == 1
-    p.join()
+    p.join(WAIT_TIMEOUT)

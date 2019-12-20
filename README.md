@@ -5,11 +5,6 @@ talos project[^ 1]
 
 
 
-
-
-
-
-
 ## 特性
 
 https://gitee.com/wu.jianjun/talos/tree/master/release
@@ -201,7 +196,7 @@ class User(Base, DictBase):
 >
 > 用models表示大致如下：
 >
-> ```
+> ```python
 > class Address(Base, DictBase):
 >     __tablename__ = 'address'
 >     attributes = ['id', 'location', 'user_id']
@@ -1489,23 +1484,85 @@ Linux：msgfmt --output-file=cms.mo cms.po
 
 ### 带宽限速
 
-talos.common.bandwidth_limiter:BandWidthLimiter
+linux系统端口带宽限速：talos.common.bandwidth_limiter:BandWidthLimiter
 
-### 导出CSV
+传输流带宽限速：未提供
 
-talos.common.exporter:export_csv
+### 格式转换
 
-### LDAP登录认证
+#### 表格导出
 
-talos.common.ldap_util:Ldap
+csv：talos.common.exporter:export_csv
+
+xlsx：未提供
+
+#### dict转xml
+
+talos.core.xmlutils:toxml
+
+xmlutils作为core模块的一份子，很重要的一点是：必须保证足够的扩展性，其提供了自定义类型的转换钩子
+
+```python
+test = {'a': 1, 'b': 1.2340932, 'c': True, 'd': None, 'e': 'hello <world />', 'f': {
+    'k': 'v', 'm': 'n'}, 'g': [1, '2', False, None, {'k': 'v', 'm': [1, 2, 3]}],
+    'h': et.Element('root')}
+toxml(test, 
+      attr_type=True,
+      hooks={'etree': {'render': lambda x: x.tag, 'hit': lambda x: isinstance(x, et.Element)}})
+```
+
+输出结果：
+
+```xml
+
+```
+
+默认情况下，所有未定义的类型，都会被default_render（实际上就是str() ）进行转换渲染
+
+hooks中定义的etree是作为xml的节点type属性输出，hit函数是用于判定定义的类型归属，render用于提取对象内容
+
+
+
+### 登录认证
+
+Ldap认证：talos.common.ldap_util:Ldap
+
+授权校验：talos.core.acl:Registry
+
+acl模块提供了扩展于RBAC的授权模式：policy概念对应角色(支持角色继承)，allow/deny对应一个权限规则，传统RBAC将角色与用户绑定即完成授权，但acl模块中，我们认为权限不是固定的，在不同的场景中，用户可以有不同的角色，来执行不同的动作，我们将场景定义为template(场景模板)，假定某用户在操作广州的资源时，可以获得最大的admin权限，而操作上海的资源时只有readonly角色权限
+
+```python
+access = Registry()
+access.add_policy('readonly')
+access.add_policy('manage', parents=('readonly',))
+access.add_policy('admin', parents=('manage',))
+access.allow('readonly', 'resource.list')
+access.allow('manage', 'resource.create')
+access.allow('manage', 'resource.update')
+access.allow('manage', 'resource.delete')
+access.allow('admin', 'auth.manage')
+# bind user1 with policies: (GZ, admin), (SH, readonly)
+# get current region: SH
+assert access.is_allowed([('GZ', 'admin'), ('SH', 'readonly')], 'SH', 'resource.create') is not True
+# bind user2 with policies: (*, manage)
+# get current region: SH
+assert access.is_allowed([('*', 'manage')], 'SH', 'resource.create') is True
+```
+
+如上所示template(场景模板)是可以模糊匹配的，其默认匹配规则如下（匹配函数可以通过Registry更改）：
+
+| Pattern  | Meaning                            |
+| -------- | ---------------------------------- |
+| `*`      | matches everything                 |
+| `?`      | matches any single character       |
+| `[seq]`  | matches any character in *seq*     |
+| `[!seq]` | matches any character not in *seq* |
+
+如此一来我们便可以便捷实现一个基于场景的角色权限校验。
 
 ### SMTP邮件发送
 
 talos.common.mailer:Mailer
-
-### 访问控制规则校验器
-
-talos.core.acl:Registry
 
 ### 实用小函数
 

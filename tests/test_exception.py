@@ -14,7 +14,7 @@ def test_exception():
         assert isinstance(e.to_dict(), dict)
         assert 'test' in e.to_dict()
         assert isinstance(e.to_json(), six.string_types)
-        assert e.to_xml().startswith('<?xml')
+        assert e.to_xml().startswith(u'<?xml'.encode('utf-8'))
         raise e
 
 

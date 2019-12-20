@@ -1,9 +1,7 @@
 # coding=utf-8
 import logging
-import warnings
 import tempfile
 import os.path
-import pytest
 
 from talos.common import exporter
 
