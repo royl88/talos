@@ -14,7 +14,7 @@ import logging
 import six
 from sqlalchemy import text, and_, or_
 import sqlalchemy.exc
-from sqlalchemy.orm import lazyload, joinedload, raiseload
+import sqlalchemy.orm
 
 from talos.core import config
 from talos.core import exceptions
@@ -526,7 +526,8 @@ class ResourceBase(object):
             query = query.filter(text('1!=1'))
         return query
 
-    def _dynamic_relationship_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True):
+    def _dynamic_relationship_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True,
+                                   load_method='subqueryload'):
         '''
         将query中所有的relationship加载方式更改为动态加载，
         在数据库依赖层级比较深或相互依赖时可提升效率
@@ -545,6 +546,11 @@ class ResourceBase(object):
         level = max(level, 1)
         orm_meta = orm_meta or self.orm_meta
         relationship_cols = orm_meta().list_relationship_columns()
+        load_method_map = {
+            'joinedload': sqlalchemy.orm.joinedload,
+            'subqueryload': sqlalchemy.orm.subqueryload,
+            'selectinload': sqlalchemy.orm.selectinload,
+            'immediateload':  sqlalchemy.orm.immediateload}
         level_map = {
             3: 'get_columns',
             2: 'list_columns',
@@ -555,7 +561,7 @@ class ResourceBase(object):
                 col = getattr(orm_meta, rel_col_name)
                 if rel_col_name in attributes:
                     # FIXME: (wujj)remove this, debug msg
-                    load_msg = 'dynamic relationship joined load: '
+                    load_msg = 'dynamic relationship eager load: '
                     if parent:
                         for p in parent.path:
                             load_msg += '[%s.%s]' % (p.parent.mapper.tables[0], p.property.key)
@@ -563,10 +569,11 @@ class ResourceBase(object):
                     LOG.debug(load_msg)
                     parent_next = None
                     if parent:
-                        parent_next = parent.joinedload(col)
+                        load_method_obj = getattr(parent, load_method)
+                        parent_next = load_method_obj(col)
                         query = query.options(parent_next)
                     else:
-                        parent_next = joinedload(col)
+                        parent_next = load_method_map[load_method](col)
                         query = query.options(parent_next)
                     # 当要按照detail级取信息时，需要根据用户指定的detail_relationship_as_summary信息进行动态判定
                     if level == 3 and parent is None and self._detail_relationship_as_summary:
@@ -577,10 +584,11 @@ class ResourceBase(object):
                                                      orm_meta=col.property.entity.entity,
                                                      level=next_level,
                                                      parent=parent_next,
-                                                     fallback_raise=fallback_raise)
+                                                     fallback_raise=fallback_raise,
+                                                     load_method=load_method)
                 else:
                     # FIXME: (wujj)remove this, debug msg
-                    load_msg = 'dynamic relationship raised load: '
+                    load_msg = 'dynamic relationship raise load: '
                     if parent:
                         for p in parent.path:
                             load_msg += '[%s.%s]' % (p.parent.mapper.tables[0], p.property.key)
@@ -588,14 +596,16 @@ class ResourceBase(object):
                     LOG.debug(load_msg)
                     if parent:
                         if fallback_raise:
-                            query = query.options(parent.raiseload(col))
+                            load_method_obj = getattr(parent, 'raiseload')
+                            query = query.options(load_method_obj(col))
                         else:
-                            query = query.options(parent.lazyload(col))
+                            load_method_obj = getattr(parent, 'lazyload')
+                            query = query.options(load_method_obj(col))
                     else:
                         if fallback_raise:
-                            query = query.options(raiseload(col))
+                            query = query.options(sqlalchemy.orm.raiseload(col))
                         else:
-                            query = query.options(lazyload(col))
+                            query = query.options(sqlalchemy.orm.lazyload(col))
         return query
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False,
