@@ -7,7 +7,7 @@
 from __future__ import absolute_import
 
 import copy
-import fnmatch
+import collections
 import logging
 import re
 
@@ -54,19 +54,19 @@ class Controller(object):
         :param req: 请求对象
         :type req: Request
         :param supported_filters: 支持参数过滤，若设置，则只允许特定字段的过滤,
-                                   ['col']意味着所有的col，col__cond查询都支持，
+                                   ['col']意味着所有的col，col__condition查询都支持
+                                   ['col$']意味仅支持默认查询(等于/in)
                                    ['col__in']意味着col仅支持in查询
-                                   ['col__*']意味着col支持所有带条件查询
+                                   ['col__.*']意味着col支持所有带条件查询
+                                   ['name(__(ilike|lte))?$']意味仅支持默认(等于/in) & ilike & lte 查询
         :type supported_filters: list
         :returns: {'filters': filters, 'offset': offset, 'limit': limit, 'fields': fields}
-        :rtype: dict
+        :rtype: dict/None
         """
 
-        def _glob_match(pattern_filters, name):
-            if pattern_filters is None or name in pattern_filters:
-                return True
+        def _filter_match(pattern_filters, value):
             for pattern_filter in pattern_filters:
-                if fnmatch.fnmatch(name, pattern_filter):
+                if pattern_filter.match(value):
                     return True
             return False
 
@@ -78,7 +78,9 @@ class Controller(object):
                 return default
             return value
 
-        query_dict = {}
+        query_dict = collections.OrderedDict()
+        # 此处仅处理name[0], name[1] ... 情况，因为需要单独将元素组装为list类型
+        # 而name[]情况下，falcon会自动组装为list，不再需要合并
         reg = re.compile(r'^(.+)\[(\d+)\]$')
         for key, value in req.params.items():
             matches = reg.match(key)
@@ -91,7 +93,7 @@ class Controller(object):
             else:
                 query_dict[key] = value
         # 移除[]后缀,兼容js数组形态查询
-        strip_query_dict = {}
+        strip_query_dict = collections.OrderedDict()
         for key, value in query_dict.items():
             if key.endswith('[]'):
                 strip_query_dict[key[:-2]] = value if utils.is_list_type(value) else [value]
@@ -119,6 +121,9 @@ class Controller(object):
         key_limit = CONF.controller.criteria_key.limit
         key_orders = CONF.controller.criteria_key.orders
         key_fields = CONF.controller.criteria_key.fields
+        filter_delimiter = CONF.controller.criteria_key.filter_delimiter
+        supported_filters = supported_filters or []
+        compiled_supported_filters = [re.compile(f) for f in supported_filters]
 
         if key_offset in query_dict:
             offset = int(none_or_empty_to_value(query_dict.pop(key_offset), 0))
@@ -140,9 +145,12 @@ class Controller(object):
                 else:
                     fields = [fields.strip()]
         for key in query_dict:
-            # 没有指定支持filters 或者 明确支持的filter且完全匹配
-            if supported_filters is None or key in supported_filters:
-                keys = key.split('__', 1)
+            # 没有指定支持filters 或者 filter完全匹配, 快速解析
+            # ?name=123  supported_filters=['name']                          -> fast
+            # ?name__ilike=123  supported_filters=['name__ilike']            -> fast
+            # ?name__ilike=123  supported_filters=['name(__[ilike|eq]])?$']  -> match
+            if len(supported_filters) == 0 or key in supported_filters:
+                keys = key.split(filter_delimiter, 1)
                 # key 是简单条件
                 if len(keys) == 1:
                     filters[key] = query_dict[key]
@@ -150,25 +158,33 @@ class Controller(object):
                 else:
                     base_key, comparator = keys[0], keys[1]
                     comparator = _transform_comparator(filter_mapping, comparator)
-                    if comparator:
-                        if base_key in filters and isinstance(filters[base_key], dict):
-                            filters[base_key].update({comparator: query_dict[key]})
-                        else:
-                            filters[base_key] = {comparator: query_dict[key]}
+                    if base_key in filters and isinstance(filters[base_key], dict):
+                        filters[base_key].update({comparator: query_dict[key]})
+                    else:
+                        filters[base_key] = {comparator: query_dict[key]}
             # 用户明确支持的filter 且 传入key不在此列表中，需要组合推测是否符合用户要求
             else:
-                for valid_key in supported_filters:
-                    # 非复杂查询条件，
-                    if not key.startswith(valid_key + '__'):
-                        continue
-                    base_key, comparator = key.split('__', 1)
+                keys = key.split(filter_delimiter, 1)
+                # key 是简单条件
+                if len(keys) == 1:
+                    if _filter_match(compiled_supported_filters, keys[0]):
+                        filters[keys[0]] = query_dict[keys[0]]
+                    elif CONF.dbcrud.unsupported_filter_as_empty:
+                        # not match for supported_filters
+                        return None
+                # key 是复杂条件
+                else:
+                    base_key, comparator = keys[0], keys[1]
                     comparator = _transform_comparator(filter_mapping, comparator)
-                    # 支持unix shell匹配条件
-                    if comparator and _glob_match(supported_filters, base_key):
+                    # 匹配条件
+                    if _filter_match(compiled_supported_filters, key):
                         if base_key in filters and isinstance(filters[base_key], dict):
                             filters[base_key].update({comparator: query_dict[key]})
                         else:
                             filters[base_key] = {comparator: query_dict[key]}
+                    elif CONF.dbcrud.unsupported_filter_as_empty:
+                        # not match for supported_filters
+                        return None
         return {'filters': filters, 'offset': offset, 'limit': limit, 'orders': orders, 'fields': fields}
 
     def make_resource(self, req):
@@ -189,9 +205,12 @@ class CollectionController(Controller, SimplifyMixin):
         :type resp: Response
         """
         self._validate_method(req)
+        refs = []
+        count = 0
         criteria = self._build_criteria(req)
-        refs = self.list(req, copy.deepcopy(criteria), **kwargs)
-        count = self.count(req, copy.deepcopy(criteria), results=refs, **kwargs)
+        if criteria:
+            refs = self.list(req, criteria, **kwargs)
+            count = self.count(req, criteria, results=refs, **kwargs)
         resp.json = {'count': count, 'data': refs}
 
     def count(self, req, criteria, results=None, **kwargs):

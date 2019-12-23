@@ -313,13 +313,16 @@ class UserPhoneNum(ResourceBase):
 
 可以看到我们此处定义了orm_meta和_primary_keys两个类属性，除此以外还有更多类属性可以帮助我们快速配置应用逻辑
 
-| 类属性          | 默认值 | 描述                                                         |
-| --------------- | ------ | ------------------------------------------------------------ |
-| orm_meta        | None   | 资源操作的SQLAlchmey Model类[表]                             |
-| _primary_keys   | 'id'   | 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表，这个是业务主键，意味着你可以定义和数据库主键不一样的字段（前提是你要确定这些字段是有唯一性的） |
-| _default_filter | {}     | 默认过滤查询，常用于软删除，比如数据删除我们在数据库字段中标记为is_deleted=True，那么我们再次list，get，update，delete的时候需要默认过滤这些数据的，等价于默认带有where is_delete = True |
-| _default_order  | []     | 默认排序，查询资源时被应用，('name', '+id', '-status'), +表示递增，-表示递减，默认递增 |
-| _validate       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表    |
+| 类属性                          | 默认值 | 描述                                                         |
+| ------------------------------- | ------ | ------------------------------------------------------------ |
+| orm_meta                        | None   | 资源操作的SQLAlchmey Model类[表]                             |
+| orm_pool                        | None   | 指定资源使用的数据库连接池，默认使用defaultPool，实例初始化参数优先于本参数 |
+| _dynamic_relationship           | None   | 是否根据Model中定义的attribute自动改变load策略，不指定则使用配置文件默认(True) |
+| _detail_relationship_as_summary | None   | 资源get获取到的第一层级外键字段级别是summary级，则设置为True，否则使用配置文件默认(False) |
+| _primary_keys                   | 'id'   | 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表，这个是业务主键，意味着你可以定义和数据库主键不一样的字段（前提是你要确定这些字段是有唯一性的） |
+| _default_filter                 | {}     | 默认过滤查询，常用于软删除，比如数据删除我们在数据库字段中标记为is_deleted=True，那么我们再次list，get，update，delete的时候需要默认过滤这些数据的，等价于默认带有where is_delete = True |
+| _default_order                  | []     | 默认排序，查询资源时被应用，('name', '+id', '-status'), +表示递增，-表示递减，默认递增 |
+| _validate                       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表    |
 一个_validate示例如下：
 
 ```python
@@ -1702,8 +1705,19 @@ def get_password(value, origin_value):
 
 1.3.1:
 
-- 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship)
+- 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship，默认已启用)
 - 更新：[db] 支持设定获取资源detail级时下级relationship指定列表级 / 摘要级(CONF.dbcrud.detail_relationship_as_summary)
+- 更新：[test]动态relationship加载/装饰器/异常/缓存/导出/校验器/控制器模块等大量单元测试
+- 更新**[breaking]**：[controller]_build_criteria的supported_filters由fnmatch更改为re匹配方式
+
+  > 由fnmatch更改为re匹配，提升效率，也提高了匹配自由度
+  >
+  > 如果您的项目中使用了supported_filters=['name\_\_\*']类似的指定支持参数，需要同步更新代码如：['name\_\_.\*']
+  >
+  > 如果仅使用过supported_filters=['name']类的指定支持参数，则依然兼容无需更改
+
+- 更新：[controller]_build_criteria支持unsupported_filter_as_empty配置(启用时，不支持参数将导致函数返回None)
+- 修复：[util] xmlutils的py2/py3兼容问题
 
 1.3.0:
 

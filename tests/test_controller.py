@@ -3,12 +3,13 @@
 import logging
 import requests
 import threading as concurrent
+import collections
 from wsgiref.simple_server import make_server
 
 from talos.core import config
+from talos.common import controller
 
-from tests import API
-
+from tests import API, MockRequest
 
 LOG = logging.getLogger(__name__)
 CONF = config.CONF
@@ -117,3 +118,129 @@ def test_list_user_only_ilike():
         result = resp.json()
         assert result['count'] == 1
     p.join(WAIT_TIMEOUT)
+
+
+def test_criteria():
+    req = MockRequest()
+    req.params = collections.OrderedDict(age='1', name__ilike='a', __limit='10', __offset='20', __orders='-name', __fields='id')
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters']['age'] == '1'
+    assert criteria['filters']['name']['ilike'] == 'a'
+    assert criteria['offset'] == 20
+    assert criteria['limit'] == 10
+    assert criteria['orders'] == ['-name']
+    assert criteria['fields'] == ['id']
+
+    req = MockRequest()
+    req.params = collections.OrderedDict(name__ilike='a', name__ne='b')
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': {'ilike': 'a', 'ne': 'b'}}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name'] = ['a', 'b', 'c']
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': ['a', 'b', 'c']}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name[]'] = ['a', 'b', 'c']
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': ['a', 'b', 'c']}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name[0]'] = 'a'
+    req.params['name[1]'] = 'b'
+    req.params['name[2]'] = 'c'
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': ['a', 'b', 'c']}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict(name__ilike='a', name__ne='b', name='c')
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': 'c'}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name__ilike'] = 'a'
+    req.params['name__ne'] = 'b'
+    req.params['name'] = 'c'
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': 'c'}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name'] = 'c'
+    req.params['name__ilike'] = 'a'
+    req.params['name__ne'] = 'b'
+    criteria = controller.Controller()._build_criteria(req)
+    assert criteria['filters'] == {'name': {'ilike': 'a', 'ne': 'b'}}
+
+
+def test_criteria_supported():
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name__ilike'] = 'a'
+    req.params['name__ne'] = 'a'
+    req.params['name__lte'] = 'a'
+    req.params['name__gte'] = 'a'
+    req.params['name__null'] = 'a'
+    criteria = controller.Controller()._build_criteria(req, ['name'])
+    assert criteria['filters'] == {'name': {'ilike': 'a',
+                                            'ne': 'a',
+                                            'lte': 'a',
+                                            'gte': 'a',
+                                            'null': 'a'}}
+    
+    criteria = controller.Controller()._build_criteria(req, ['name(__(ilike|lte))?$'])
+    assert criteria['filters'] == {'name': {'ilike': 'a',
+                                            'lte': 'a'}}
+
+    criteria = controller.Controller()._build_criteria(req, ['name__(ilike|nnull)$'])
+    assert criteria['filters'] == {'name': {'ilike': 'a'}}
+
+    req = MockRequest()
+    req.params = collections.OrderedDict()
+    req.params['name'] = ['1', '2']
+    criteria = controller.Controller()._build_criteria(req, ['name(__(ilike|lte))?$'])
+    assert criteria['filters'] == {'name': ['1', '2']}
+
+    criteria = controller.Controller()._build_criteria(req, ['name__(ilike|lte)$'])
+    assert criteria['filters'] == {}
+
+
+def test_criteria_unsupported_as_empty():
+    try:
+        origin_conf_val = CONF.dbcrud.unsupported_filter_as_empty
+        CONF.to_dict()['dbcrud']['unsupported_filter_as_empty'] = True
+        req = MockRequest()
+        req.params = collections.OrderedDict()
+        req.params['name__ilike'] = 'a'
+        req.params['name__ne'] = 'a'
+        req.params['name__lte'] = 'a'
+        req.params['name__gte'] = 'a'
+        req.params['name__null'] = 'a'
+        criteria = controller.Controller()._build_criteria(req, ['name'])
+        assert criteria['filters'] == {'name': {'ilike': 'a',
+                                                'ne': 'a',
+                                                'lte': 'a',
+                                                'gte': 'a',
+                                                'null': 'a'}}
+
+        criteria = controller.Controller()._build_criteria(req, ['name(__(ilike|lte))?$'])
+        assert criteria is None
+
+        criteria = controller.Controller()._build_criteria(req, ['name__(ilike|nnull)$'])
+        assert criteria is None
+
+        req = MockRequest()
+        req.params = collections.OrderedDict()
+        req.params['name'] = ['1', '2']
+        criteria = controller.Controller()._build_criteria(req, ['name(__(ilike|lte))?$'])
+        assert criteria['filters'] == {'name': ['1', '2']}
+
+        criteria = controller.Controller()._build_criteria(req, ['name__(ilike|lte)$'])
+        assert criteria is None
+    finally:
+        CONF.to_dict()['dbcrud']['unsupported_filter_as_empty'] = origin_conf_val

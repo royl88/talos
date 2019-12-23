@@ -264,7 +264,8 @@ CONFIG_OPTS = {
             'offset': '__offset',
             'limit': '__limit',
             'orders': '__orders',
-            'fields': '__fields'
+            'fields': '__fields',
+            'filter_delimiter': '__'
         }
     },
     'log': {
