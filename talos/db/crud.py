@@ -299,8 +299,12 @@ class ResourceBase(object):
     orm_meta = None
     # DB连接池对象，若不指定，默认使用defaultPool
     orm_pool = None
-    # 是否根据Model中定义的attribute自动改变load策略
+    # 是否根据Model中定义的attribute自动改变外键加载策略
     _dynamic_relationship = None
+    # 启用动态外键加载策略时，动态加载外键的方式，默认joinedload（取决于全局配置）
+    # joinedload 简便，在常用小型查询中响应优于subqueryload
+    # subqueryload 在大型复杂(多层外键)查询中响应优于joinedload
+    _dynamic_load_method = None
     # get获取信息时，默认根据detail->list->summary层级依次进行取值(取决于全局配置)
     # 如果希望本资源get获取到的第一层级外键是summary级，则设置为True
     _detail_relationship_as_summary = None
@@ -320,7 +324,8 @@ class ResourceBase(object):
     # converter，对象实例，converter中的类型，可以自定义
     _validate = []
 
-    def __init__(self, session=None, transaction=None, dbpool=None, dynamic_relationship=None):
+    def __init__(self, session=None, transaction=None, dbpool=None, dynamic_relationship=None,
+                 dynamic_load_method=None):
         def _first_not_none(vals):
             for v in vals:
                 if v is not None:
@@ -329,6 +334,8 @@ class ResourceBase(object):
         self._pool = dbpool or self.orm_pool or pool.defaultPool
         load_strategies = [dynamic_relationship, self._dynamic_relationship, CONF.dbcrud.dynamic_relationship]
         self._dynamic_relationship = _first_not_none(load_strategies)
+        load_methods = [dynamic_load_method, self._dynamic_load_method, CONF.dbcrud.dynamic_load_method]
+        self._dynamic_load_method = _first_not_none(load_methods)
         self._detail_relationship_as_summary = CONF.dbcrud.detail_relationship_as_summary if self._detail_relationship_as_summary is None else self._detail_relationship_as_summary
         self._session = session
         self._transaction = transaction
@@ -526,8 +533,7 @@ class ResourceBase(object):
             query = query.filter(text('1!=1'))
         return query
 
-    def _dynamic_relationship_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True,
-                                   load_method='subqueryload'):
+    def _dynamic_relationship_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True):
         '''
         将query中所有的relationship加载方式更改为动态加载，
         在数据库依赖层级比较深或相互依赖时可提升效率
@@ -569,11 +575,11 @@ class ResourceBase(object):
                     LOG.debug(load_msg)
                     parent_next = None
                     if parent:
-                        load_method_obj = getattr(parent, load_method)
+                        load_method_obj = getattr(parent, self._dynamic_load_method)
                         parent_next = load_method_obj(col)
                         query = query.options(parent_next)
                     else:
-                        parent_next = load_method_map[load_method](col)
+                        parent_next = load_method_map[self._dynamic_load_method](col)
                         query = query.options(parent_next)
                     # 当要按照detail级取信息时，需要根据用户指定的detail_relationship_as_summary信息进行动态判定
                     if level == 3 and parent is None and self._detail_relationship_as_summary:
@@ -584,8 +590,7 @@ class ResourceBase(object):
                                                      orm_meta=col.property.entity.entity,
                                                      level=next_level,
                                                      parent=parent_next,
-                                                     fallback_raise=fallback_raise,
-                                                     load_method=load_method)
+                                                     fallback_raise=fallback_raise)
                 else:
                     # FIXME: (wujj)remove this, debug msg
                     load_msg = 'dynamic relationship raise load: '
@@ -596,11 +601,9 @@ class ResourceBase(object):
                     LOG.debug(load_msg)
                     if parent:
                         if fallback_raise:
-                            load_method_obj = getattr(parent, 'raiseload')
-                            query = query.options(load_method_obj(col))
+                            query = query.options(parent.raiseload(col))
                         else:
-                            load_method_obj = getattr(parent, 'lazyload')
-                            query = query.options(load_method_obj(col))
+                            query = query.options(parent.lazyload(col))
                     else:
                         if fallback_raise:
                             query = query.options(sqlalchemy.orm.raiseload(col))

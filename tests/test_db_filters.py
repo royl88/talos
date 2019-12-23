@@ -15,6 +15,7 @@ CONF = config.CONF
 
 
 class _Base(crud.ResourceBase):
+    _dynamic_load_method = 'joinedload'
 
     def _unsupported_filter(self, query, idx, name, op, value):
         LOG.error('#############################unsupported filter#####################################')
@@ -32,11 +33,6 @@ class _Base(crud.ResourceBase):
         LOG.error('#############################get query#####################################')
         LOG.error('%s' % query)
         return query
-
-    def _dynamic_relationship_load(self, query, orm_meta=None, level=2, parent=None, fallback_raise=True,
-        load_method='subqueryload'):
-        load_method = 'joinedload'
-        return crud.ResourceBase._dynamic_relationship_load(self, query, orm_meta=orm_meta, level=level, parent=parent, fallback_raise=fallback_raise, load_method=load_method)
 
 
 class _Department(_Base):

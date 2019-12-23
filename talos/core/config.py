@@ -289,6 +289,7 @@ CONFIG_OPTS = {
     'dbcrud': {
         'unsupported_filter_as_empty': False,
         'dynamic_relationship': True,
+        'dynamic_load_method': 'joinedload',
         'detail_relationship_as_summary': False,
     },
     'cache': {
