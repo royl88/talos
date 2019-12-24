@@ -318,8 +318,11 @@ class UserPhoneNum(ResourceBase):
 | orm_meta                        | None   | 资源操作的SQLAlchmey Model类[表]                             |
 | orm_pool                        | None   | 指定资源使用的数据库连接池，默认使用defaultPool，实例初始化参数优先于本参数 |
 | _dynamic_relationship           | None   | 是否根据Model中定义的attribute自动改变load策略，不指定则使用配置文件默认(True) |
+| _dynamic_load_method            | None   | 启用动态外键加载策略时，动态加载外键的方式，默认None，即使用全局配置（全局配置默认joinedload）
+<br/>joinedload 简便，在常用小型查询中响应优于subqueryload
+<br/>subqueryload 在大型复杂(多层外键)查询中响应优于joinedload |
 | _detail_relationship_as_summary | None   | 资源get获取到的第一层级外键字段级别是summary级，则设置为True，否则使用配置文件默认(False) |
-| _primary_keys                   | 'id'   | 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表，这个是业务主键，意味着你可以定义和数据库主键不一样的字段（前提是你要确定这些字段是有唯一性的） |
+| _primary_keys                   | 'id'   | 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表，这个是业务主键，意味着你可以定义和数据库主键不一样的字段（前提是要确定这些字段是有唯一性的） |
 | _default_filter                 | {}     | 默认过滤查询，常用于软删除，比如数据删除我们在数据库字段中标记为is_deleted=True，那么我们再次list，get，update，delete的时候需要默认过滤这些数据的，等价于默认带有where is_delete = True |
 | _default_order                  | []     | 默认排序，查询资源时被应用，('name', '+id', '-status'), +表示递增，-表示递减，默认递增 |
 | _validate                       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表    |
@@ -1674,6 +1677,7 @@ def get_password(value, origin_value):
 | dbcrud                                 | dict   | 数据库CRUD控制项                                             |                                                              |
 | dbcrud.unsupported_filter_as_empty     | bool   | 当遇到不支持的filter时的默认行为，1是返回空结果，2是忽略不支持的条件，由于历史版本的行为默认为2，因此其默认值为False，即忽略不支持的条件 | False                                                        |
 | dbcrud.dynamic_relationship            | bool   | 是否启用ORM的动态relationship加载技术，启用后可以通过models.attributes来控制外键动态加载，避免数据过载导致查询缓慢 | True                                                         |
+| dbcrud.dynamic_load_method             | string | 启用ORM的动态relationship加载技术后，可指定加载方式：joinedload，subqueryload，selectinload，immediateload<br/>**joinedload**：使用outer join将所有查询连接为一个语句，结果集少时速度最快，随着结果集和级联外键数量的增加，字段的展开会导致数据极大而加载缓慢<br/>**subqueryload**：比较折中的方式，使用外键独立sql查询，结果集少时速度较快，随着结果集和级联外键数量的增加，速度逐步优于joinedload<br/>**selectinload**：类似subqueryload，但每个查询使用结果集的主键组合为in查询，速度慢<br/>**immediateload**：类似SQLAlchemy的select懒加载，每行的外键单独使用一个查询，速度最慢<br/> | joinedload                                                   |
 | dbcrud.detail_relationship_as_summary  | bool   | 控制获取详情时，下级relationship是列表级或摘要级，False为列表级，True为摘要级，默认False | False                                                        |
 | cache                                  | dict   | 缓存配置项                                                   |                                                              |
 | cache.type                             | string | 缓存后端类型                                                 | dogpile.cache.memory                                         |
@@ -1705,7 +1709,7 @@ def get_password(value, origin_value):
 
 1.3.1:
 
-- 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship，默认已启用)
+- 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship，默认已启用)，并可以指定load方式(默认joinedload)
 - 更新：[db] 支持设定获取资源detail级时下级relationship指定列表级 / 摘要级(CONF.dbcrud.detail_relationship_as_summary)
 - 更新：[test]动态relationship加载/装饰器/异常/缓存/导出/校验器/控制器模块等大量单元测试
 - 更新**[breaking]**：[controller]_build_criteria的supported_filters由fnmatch更改为re匹配方式
