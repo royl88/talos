@@ -568,10 +568,11 @@ class ResourceBase(object):
                 if rel_col_name in attributes:
                     # FIXME: (wujj)remove this, debug msg
                     load_msg = 'dynamic relationship eager load: '
+                    load_msg += '%s->' % self.__class__.__name__
                     if parent:
                         for p in parent.path:
-                            load_msg += '[%s.%s]' % (p.parent.mapper.tables[0], p.property.key)
-                    load_msg += ' %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key)
+                            load_msg += '%s->' % p.property.key
+                    load_msg += '%s' % col.property.key
                     LOG.debug(load_msg)
                     parent_next = None
                     if parent:
@@ -594,10 +595,11 @@ class ResourceBase(object):
                 else:
                     # FIXME: (wujj)remove this, debug msg
                     load_msg = 'dynamic relationship raise load: '
+                    load_msg += '%s->' % self.__class__.__name__
                     if parent:
                         for p in parent.path:
-                            load_msg += '[%s.%s]' % (p.parent.mapper.tables[0], p.property.key)
-                    load_msg += ' %s.%s' % (orm_meta._sa_class_manager.mapper.tables[0], col.property.key)
+                            load_msg += '%s->' % p.property.key
+                    load_msg += '%s' % col.property.key
                     LOG.debug(load_msg)
                     if parent:
                         if fallback_raise:
