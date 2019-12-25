@@ -219,14 +219,14 @@ class TScheduler(Scheduler):
                 return 0
             else:
                 heappush(H, verify)
-                return min(verify[0], max_interval)
+                return  max(0, min(verify[0], max_interval))
         else:
             # 此任务已经永远无法被调度到，直接从heap中移除, 并且马上tick计算下一个
             if next_time_to_run is None:
                 heappop(H)
                 if self._heap:
                     return 0
-        return min(adjust(next_time_to_run) or max_interval, max_interval)
+        return max(0, min(next_time_to_run or max_interval, max_interval))
 
     def setup_schedule(self):
         self.install_default_entries(self.data)
