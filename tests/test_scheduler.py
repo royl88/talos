@@ -72,22 +72,30 @@ class MockConf(object):
     beat_max_loop_interval = 3
     beat_sync_every = 60
 
+
 def schedule_changed(val):
-    return True
+    if not hasattr(val, '_pytest_already_set_changed'):
+        val._pytest_already_set_changed = True
+        return True
+    return False
+
     
 class MockBackend(object):
     supports_autoexpire = False
 
 
 class MockTask(object):
+
     def get(self, *args, **kwargs):
         pass
+
 
 class MockApp(object):
     timezone = 'UTC'
     conf = MockConf()
     backend = MockBackend()
     tasks = MockTask()
+
     def now(self):
         return datetime.datetime.now()
     
@@ -111,19 +119,27 @@ class MockApp(object):
 def test_scheduler():
     c_app = MockApp()
     s = scheduler.TScheduler(c_app, Producer=MockAny())
-    exit_code = 0
     counter = 0
-    for counter in range(80):
+    exit_code = 0
+    # 不会使用到60s
+    max_t = 60.0
+    change_t = 18.0
+    start_t = time.time()
+    end_t = start_t
+    changed = False
+    while (end_t - start_t) <= max_t :
         interval = s.tick()
         print('wait %s to due' % interval)
-        if counter >= 70 and interval > 2.0:
-            exit_code = 1
-            break
-        if counter == 50:
+        if interval > 2.1:
+            counter += 1
+            if counter > 3:
+                exit_code = 1
+                break
+        if changed is False and (end_t - start_t) > change_t:
             c_app.conf.beat_schedule = c_app.conf.beat_schedule_changed
             s.on_user_schedules_changed = [schedule_changed]
-        else:
-            s.on_user_schedules_changed = []
+            changed = True
         time.sleep(interval)
-    assert exit_code == 1 and counter > 50
+        end_t = time.time()
+    assert exit_code == 1
 
