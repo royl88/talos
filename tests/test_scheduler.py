@@ -37,6 +37,16 @@ class MockConf(object):
             "task": "tests.test_scheduler.job",
             "schedule": "1.0",
             "args": []},
+         "test_interval_0.2": {
+            "type": "interval",
+            "task": "tests.test_scheduler.job",
+            "schedule": "0.2",
+            "args": []},
+          "test_interval_0.7": {
+            "type": "interval",
+            "task": "tests.test_scheduler.job",
+            "schedule": "0.7",
+            "args": []},
         "test_interval_2_disable": {
             "type": "interval",
             "task": "tests.test_scheduler.job",
@@ -129,7 +139,9 @@ def test_scheduler():
     changed = False
     while (end_t - start_t) <= max_t :
         interval = s.tick()
-        print('wait %s to due' % interval)
+        if interval and interval > 0.0:
+            print('wait %s to due' % interval)
+            time.sleep(interval)
         if interval > 2.1:
             counter += 1
             if counter > 3:
@@ -139,7 +151,6 @@ def test_scheduler():
             c_app.conf.beat_schedule = c_app.conf.beat_schedule_changed
             s.on_user_schedules_changed = [schedule_changed]
             changed = True
-        time.sleep(interval)
         end_t = time.time()
     assert exit_code == 1
 

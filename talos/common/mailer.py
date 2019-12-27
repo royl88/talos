@@ -7,7 +7,6 @@
 from __future__ import absolute_import
 
 from email.mime.image import MIMEImage
-from email.mime.audio import MIMEAudio
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -68,7 +67,7 @@ def render(text, **kwargs):
     :returns: 邮件内容
     :rtype: str
     """
-    templ = Template(text)
+    templ = Template(utils.ensure_unicode(text), strict_undefined=True)
     return templ.render(**kwargs)
 
 
@@ -99,20 +98,21 @@ def to_address_list(address, recursive=True):
     :rtype: list
     """
     addrs = []
-    inner_addrs = []
     if utils.is_string_type(address):
         if COMMASPACE.strip() in address:
             addrs = address.split(COMMASPACE.strip())
         else:
             addrs = address.split(SEMICOLONSPACE.strip())
+        addrs = [ad.strip() for ad in addrs if ad]
     else:
-        addrs = address
-        for n in range(len(addrs)):
+        for addr in address:
             if recursive:
-                inner_addrs.extend(to_address_list(addrs[n].strip(), recursive=False))
-                addrs[n] = None
-    addrs = [ad.strip() for ad in addrs if ad]
-    addrs.extend(inner_addrs)
+                addrs.extend(to_address_list(addr, recursive=True))
+            else:
+                if utils.is_string_type(addr):
+                    addrs.append(addr.strip())
+                else:
+                    addrs.extend(addr)
     return addrs
 
 
@@ -195,16 +195,10 @@ class Mailer(object):
             if utils.is_string_type(filename):
                 # 猜测附件类型
                 attachment_type, attachment_encoding = mimetypes.guess_type(filename)
-                # 图片附件
+                # 图片附件,因图片可能在正文中进行引入，所以特殊处理
                 if attachment_type is not None and attachment_type.startswith('image/'):
                     with open(filename, 'rb') as f:
                         attchment = MIMEImage(f.read())
-                        attchment['Content-ID'] = os.path.basename(filename).split('.')[0]
-                        msg.attach(attchment)
-                # 音频附件
-                elif attachment_type is not None and attachment_type.startswith('audio/'):
-                    with open(filename, 'rb') as f:
-                        attchment = MIMEAudio(f.read())
                         attchment['Content-ID'] = os.path.basename(filename).split('.')[0]
                         msg.attach(attchment)
                 # 二进制流附件

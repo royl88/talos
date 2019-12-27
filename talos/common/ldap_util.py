@@ -15,7 +15,7 @@ import logging
 try:
     # windows机器导入会抛异常  一般用于调试
     import ldap
-    from ldap.controls import SimplePagedResultsControl
+    import ldap.controls
 except:
     pass
 
@@ -53,7 +53,7 @@ class Ldap(object):
         # 关闭MS AD的referrals特性(OpenLDAPv3兼容问题)
         self.ldap_connection.set_option(ldap.OPT_REFERRALS, 0)
         self.ldap_connection.protocol_version = 3
-        if self.admin_username and self.admin_password:
+        if self.admin_username is not None and self.admin_password is not None:
             username = '%s%s' % (self.admin_username, self.account_suffix)
             self.ldap_connection.simple_bind_s(username, self.admin_password)
 
@@ -91,7 +91,7 @@ class Ldap(object):
     def users(self, filters=None, attrs=None):
         results = []
         filters = filters or 'objectCategory=person'
-        pg_ctrl = SimplePagedResultsControl(True, size=AD_PAGE_SIZE, cookie="")
+        pg_ctrl = ldap.controls.SimplePagedResultsControl(True, size=AD_PAGE_SIZE, cookie="")
         attrs = attrs or self.user_attrs
         try:
             while True:
