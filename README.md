@@ -318,15 +318,14 @@ class UserPhoneNum(ResourceBase):
 | orm_meta                        | None   | 资源操作的SQLAlchmey Model类[表]                             |
 | orm_pool                        | None   | 指定资源使用的数据库连接池，默认使用defaultPool，实例初始化参数优先于本参数 |
 | _dynamic_relationship           | None   | 是否根据Model中定义的attribute自动改变load策略，不指定则使用配置文件默认(True) |
-| _dynamic_load_method            | None   | 启用动态外键加载策略时，动态加载外键的方式，默认None，即使用全局配置（全局配置默认joinedload）
-<br/>joinedload 简便，在常用小型查询中响应优于subqueryload
-<br/>subqueryload 在大型复杂(多层外键)查询中响应优于joinedload |
+| _dynamic_load_method            | None   | 启用动态外键加载策略时，动态加载外键的方式，默认None，即使用全局配置（全局配置默认joinedload） <br/> joinedload 简便，在常用小型查询中响应优于subqueryload  <br/>subqueryload 在大型复杂(多层外键)查询中响应优于joinedload |
 | _detail_relationship_as_summary | None   | 资源get获取到的第一层级外键字段级别是summary级，则设置为True，否则使用配置文件默认(False) |
 | _primary_keys                   | 'id'   | 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表，这个是业务主键，意味着你可以定义和数据库主键不一样的字段（前提是要确定这些字段是有唯一性的） |
 | _default_filter                 | {}     | 默认过滤查询，常用于软删除，比如数据删除我们在数据库字段中标记为is_deleted=True，那么我们再次list，get，update，delete的时候需要默认过滤这些数据的，等价于默认带有where is_delete = True |
 | _default_order                  | []     | 默认排序，查询资源时被应用，('name', '+id', '-status'), +表示递增，-表示递减，默认递增 |
 | _validate                       | []     | 数据输入校验规则，为talos.db.crud.ColumnValidator对象列表    |
-一个_validate示例如下：
+
+一个validate示例如下：
 
 ```python
    ColumnValidator(field='id',
@@ -1230,17 +1229,17 @@ def test(arg):
     - 将Limiter配置到启动中间件
     
     装饰器通过管理映射关系表LIMITEDS，LIMITEDS_EXEMPT来定位用户设置的类实例->频率限制器关系，
-    频率限制器是实力级别的，意味着每个实例都使用自己的频率限制器
+    频率限制器是实例级别的，意味着每个实例都使用自己的频率限制器
     
     频率限制器有7个主要参数：频率设置，关键限制参数，限制范围，是否对独立方法进行不同限制, 算法，错误提示信息, hit函数
     
-    - 频率设置：格式[count] [per|/] [n (optional)] [second|minute|hour|day|month|year]
-    - 关键限制参数：默认为IP地址(支持X-Forwarded-For)，自定义函数：def key_func(request) -> string
-    - 限制范围：默认python类完整路径，自定义函数def scope_func(request) -> string
-    - 是否对独立方法进行不同限制: 布尔值，默认True
-    - 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
-    - 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
-    - hit函数：函数定义为def hit(resource, request) -> bool，为True时则触发频率限制器hit，否则忽略
+    :param limit_value: 频率设置：格式[count] [per|/] [n (optional)][second|minute|hour|day|month|year]
+    :param key_function: 关键限制参数：默认为IP地址(支持X-Forwarded-For)，自定义函数：def key_func(req) -> string
+    :param scope: 限制范围空间：默认python类完整路径，自定义函数def scope_func(request) -> string
+    :param per_method: 指定是否根据每个HTTP方法区分频率限制，默认True
+    :param strategy: 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
+    :param message: 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
+    :param hit_func: 函数定义为def hit(controller, request) -> bool，为True时则触发频率限制器hit，否则忽略
 
 > PS：真正的频率限制范围 = 关键限制参数(默认IP地址) + 限制范围(默认python类完整路径) + 方法名(如果区分独立方法)，当此频率范围被命中后才会触发频率限制
 
@@ -1321,25 +1320,25 @@ application = base.initialize_server('cms',
 ```python
 from talos.common import decorators as deco
 
-@deco.limit('1/second')
+@deco.flimit('1/second')
 def test():
     pass
 ```
 
 
 
-    用于装饰一个函数、类函数表示其受限于此调用频率
+    用于装饰一个函数表示其受限于此调用频率
     当装饰类成员函数时，频率限制范围是类级别的，意味着类的不同实例共享相同的频率限制，
     如果需要实例级隔离的频率限制，需要手动指定key_func，并使用返回实例标识作为限制参数
     
     :param limit_value: 频率设置：格式[count] [per|/] [n (optional)][second|minute|hour|day|month|year]
-    :param scope: 限制范围空间：默认python类/函数完整路径.
+    :param scope: 限制范围空间：默认python类/函数完整路径 or 自定义字符串.
     :param key_func: 关键限制参数：默认为空字符串，自定义函数：def key_func(*args, **kwargs) -> string
     :param strategy: 算法：支持fixed-window、fixed-window-elastic-expiry、moving-window
     :param message: 错误提示信息：错误提示信息可接受3个格式化（limit，remaining，reset）内容
     :param storage: 频率限制后端存储数据，如: memory://, redis://:pass@localhost:6379
-    :param hit_func: 函数定义为def hit(result) -> bool，为True时则触发频率限制器hit，否则忽略
-    :param delay_hit: 默认在函数执行前测试频率hit，可以设置为True将频率测试hit放置在函数执行后，搭配hit_func
+    :param hit_func: 函数定义为def hit(result) -> bool（参数为用户函数执行结果，若delay_hit=False，则参数为None），为True时则触发频率限制器hit，否则忽略
+    :param delay_hit: 默认在函数执行前测试频率hit(False)，可以设置为True将频率测试hit放置在函数执行后，搭配hit_func
                        使用，可以获取到函数执行结果来控制是否执行hit
 关于函数频率限制模块更多用例，请见单元测试tests.test_limit_func
 
@@ -1362,6 +1361,13 @@ head指最新版本，base指最原始版本即models第一个version，更多�
 - alembic downgrade -1 回退一个版本
 
 - alembic upgrade ae10+2 升级到ae1027a6acf+2个版本
+
+```python
+# alembic 脚本内手动执行sql语句
+op.execute('raw sql ...')
+```
+
+
 
 
 #### 单元测试
@@ -1407,7 +1413,9 @@ Sphinx的注释格式这里不再赘述，可以参考网上文档教程，talos
 
 - 安装sphinx
 
-- 在工程目录下运行sphinx-quickstart
+- 在工程目录下运行：
+
+  sphinx-quickstart docs
 
   - root path for the documentation [.]: docs
   - Project name: cms

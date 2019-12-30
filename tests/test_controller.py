@@ -156,10 +156,12 @@ def test_criteria():
     criteria = controller.Controller()._build_criteria(req)
     assert criteria['filters'] == {'name': ['a', 'b', 'c']}
 
-    req = MockRequest()
-    req.params = collections.OrderedDict(name__ilike='a', name__ne='b', name='c')
-    criteria = controller.Controller()._build_criteria(req)
-    assert criteria['filters'] == {'name': 'c'}
+    # 不同版本OrderedDict的kwargs初始化方式可能会得到不同的排序结果
+    # 但这不意味着_build_criteria的处理方式不正确，因此本用例被注释，详见下一用例
+    # req = MockRequest()
+    # req.params = collections.OrderedDict(name__ilike='a', name__ne='b', name='c')
+    # criteria = controller.Controller()._build_criteria(req)
+    # assert criteria['filters'] == {'name': 'c'}
 
     req = MockRequest()
     req.params = collections.OrderedDict()

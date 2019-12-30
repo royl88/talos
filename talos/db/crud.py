@@ -671,7 +671,7 @@ class ResourceBase(object):
             query = self._apply_filters(query, orm_meta, self.default_filter)
         do_dynamic_relationship = self._dynamic_relationship if dynamic_relationship is None else dynamic_relationship
         if do_dynamic_relationship:
-            query = self._dynamic_relationship_load(query, level=level_of_relationship)
+            query = self._dynamic_relationship_load(query, orm_meta=orm_meta, level=level_of_relationship)
         return query
 
     def _apply_primary_key_filter(self, query, rid):
