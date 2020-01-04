@@ -11,8 +11,9 @@ envlist = py27, py36
 [testenv]
 commands = python setup.py test
 deps =
-    pytest<4.1
+    pytest
     pytest-runner
     pytest-html
     pytest-cov
+    pytest-mock
 '''

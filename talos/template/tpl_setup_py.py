@@ -55,25 +55,29 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable ',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
-        'Topic :: Software Development :: Build Tools',
+        'License :: OSI Approved :: Apache Software License ',
 
-        # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: Apache-2.0',
+        'Topic :: Software Development :: Libraries',
+
+        'Framework :: Falcon',
+        'Framework :: SQLAlchemy',
+        'Framework :: Celery',
+        'Framework :: Talos',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+
+        'Operating System :: OS Independent'
     ],
 
     # What does your project relate to?
@@ -97,7 +101,7 @@ setup(
     # dependencies). You can install these using the following syntax,
     # for example:
     # $ pip install -e .[testing]
-    extras_require={'testing': ['pytest<4.1', 'pytest-runner', 'pytest-html', 'pytest-cov']},
+    extras_require={'testing': ['pytest', 'pytest-runner', 'pytest-html', 'pytest-cov', 'pytest-mock']},
 
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
