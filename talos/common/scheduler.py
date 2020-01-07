@@ -74,7 +74,7 @@ class TEntry(ScheduleEntry):
         self.name = model['name']
         self.task = model['task']
         self.args = model.get('args')
-        self.kwargs = model.get('kwargs')
+        self.kwargs = model.get('kwargs') or {}
         self.options = {'expires': model['expires']} if model.get('expires') else {}
         self.schedule = maybe_schedule(model, app=self.app)
 
