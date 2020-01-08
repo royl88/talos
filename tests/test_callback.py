@@ -70,3 +70,24 @@ def test_limited_hosts():
         with l:
             ret = callback.limithosts.remote(None)
         p.join()
+
+
+def test_add_backward_compatible():
+    l = concurrent.Lock()
+    p = start_server(l)
+    with l:
+        ret = callback.add_backward_compatible.remote({'hello':'world'}, task_id='t1')
+        assert ret == {'task_id': 't1', 'data': {'hello':'world'}}
+    p.join()
+    p = start_server(l)
+    with l:
+        ret = callback.add_backward_compatible.remote(data={'hello':'world'}, task_id='t1')
+        assert ret == {'task_id': 't1', 'data': {'hello':'world'}}
+    p.join()
+    p = start_server(l)
+    with l:
+        ret = callback.async_helper.send_callback(None, callback.add_backward_compatible,
+                                            data={'hello':'world'},
+                                            task_id='t1')
+        assert ret == {'task_id': 't1', 'data': {'hello':'world'}}
+    p.join()

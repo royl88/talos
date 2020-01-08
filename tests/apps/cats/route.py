@@ -12,3 +12,4 @@ def add_routes(api):
     async_helper.add_callback_route(api, callback.add)
     async_helper.add_callback_route(api, callback.timeout)
     async_helper.add_callback_route(api, callback.limithosts)
+    async_helper.add_callback_route(api, callback.add_backward_compatible)
