@@ -6,6 +6,8 @@ import logging
 import uuid
 
 from falcon.routing import util
+import ipaddress
+
 from talos.common import celery
 from talos.core import config
 from talos.core import exceptions
@@ -46,7 +48,7 @@ class CallbackController(object):
         if allow_hosts is not None:
             return set(allow_hosts)
 
-    def template(self, req, resp, **kwargs):
+    def _check_auth(self, req, resp):
         strict_client = talos_util.get_config(CONF, 'worker.callback.strict_client', True)
         global_allow_hosts = talos_util.get_config(CONF, 'worker.callback.allow_hosts', None)
         name_allow_hosts = talos_util.get_config(CONF, 'worker.callback.name', None)
@@ -55,8 +57,13 @@ class CallbackController(object):
             name_allow_hosts = name_allow_hosts.get(self.name, {}).get('allow_hosts', None)
         allow_hosts = self._merge_hosts(global_allow_hosts, name_allow_hosts)
         cur_client = self._get_ipaddr(req, strict_client)
-        if allow_hosts is not None and cur_client not in allow_hosts:
+        if allow_hosts:
+            allow_hosts = [ipaddress.IPv4Network(talos_util.ensure_unicode(h), strict=False) for h in allow_hosts]
+        if allow_hosts is not None and ipaddress.IPv4Address(talos_util.ensure_unicode(cur_client)) not in allow_hosts:
             raise exceptions.ForbiddenError()
+
+    def template(self, req, resp, **kwargs):
+        self._check_auth(req, resp)
         data = getattr(req, 'json', None)
         if self.with_request:
             kwargs['request'] = req
