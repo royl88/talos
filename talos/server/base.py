@@ -57,21 +57,27 @@ class EnhancedHTTPError(falcon.HTTPError):
 
 def error_http_exception(ex, req, resp, params):
     """捕获并转换内部Exception为falcon Exception"""
-    LOG.exception(ex)
     code = None
     title = None
     description = None
     exception_data = None
     if isinstance(ex, falcon.errors.HTTPError):
+        # 只捕获HTTPError
+        LOG.exception(ex)
         code = int(ex.status.split(' ', 1)[0])
         title = ex.status.split(' ', 1)[1]
         description = title if ex.description is None else ex.description
+    elif isinstance(ex, falcon.http_status.HTTPStatus):
+        # falcon中redirect作为异常抛出，但不需要额外处理
+        raise ex
     elif isinstance(ex, exceptions.Error):
+        # 抛出框架异常，用户有意为之，不需要LOG
         code = ex.code
         title = ex.title
         description = ex.message
         exception_data = ex.exception_data
     else:
+        LOG.exception(ex)
         code = 500
         title = 'Internal Server Error'
         description = str(ex)

@@ -190,6 +190,9 @@ class Controller(object):
     def make_resource(self, req):
         return self.resource()
 
+    def redirect(self, location):
+        raise falcon.redirects.HTTPFound(location)
+
 
 class CollectionController(Controller, SimplifyMixin):
     """集合控制器"""

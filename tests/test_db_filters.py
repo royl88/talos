@@ -112,6 +112,16 @@ class _BusinessDetailSum(_Business):
     _detail_relationship_as_summary = True
 
 
+class _BusinessDisableDnyamicRel(_Business):
+    '''
+    id    name    owner_dep_id    create_user_id
+    1     bus1    1               1
+    '''
+
+    orm_meta = models.Business
+    _dynamic_relationship = False
+
+
 def test_orders():
     users = _User().list(orders=['-age', '+id', 'name'])
     LOG.info(users)
@@ -305,3 +315,6 @@ def test_dynamic_relationship():
     assert 'address' not in str(bs_query)
     bs_query = _BusinessDetailSum().get_detail_query('1')
     assert 'address' not in str(bs_query)
+
+    bs_query = _BusinessDisableDnyamicRel().get_list_query()
+    assert 'address' in str(bs_query)

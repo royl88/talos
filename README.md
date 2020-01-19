@@ -1733,6 +1733,10 @@ def get_password(value, origin_value):
 
 - 更新：[controller]_build_criteria支持unsupported_filter_as_empty配置(启用时，不支持参数将导致函数返回None)
 
+- 更新：[controller]增加redirect重定向函数
+
+- 修复：[controller]支持原生falcon的raise HTTPTemporaryRedirect(...)形式重定向
+
 - 修复：[util] xmlutils的py2/py3兼容问题
 
 - 修复：[schedule] TScheduler概率丢失一个max_interval时间段定时任务问题
