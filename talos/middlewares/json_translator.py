@@ -30,7 +30,7 @@ class JSONTranslator(object):
             return
 
         # 修复falcon重复读取导致无法解析json问题，因此不再使用media
-        body = req.stream.read()
+        body = req.stream.read(req.content_length or 0)
         if not body:
             raise exceptions.BodyParseError(msg=_('empty request body, a valid json document is required.'))
         try:

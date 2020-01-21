@@ -1711,19 +1711,29 @@ def get_password(value, origin_value):
 1.3.1:
 
 - 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship，默认已启用)，并可以指定load方式(默认joinedload)
+
 - 更新：[db] 支持设定获取资源detail级时下级relationship指定列表级 / 摘要级(CONF.dbcrud.detail_relationship_as_summary)
+
 - 更新：[test]动态relationship加载/装饰器/异常/缓存/导出/校验器/控制器模块等大量单元测试
+
 - 更新**[breaking]**：[controller]_build_criteria的supported_filters由fnmatch更改为re匹配方式
   > 由fnmatch更改为re匹配，提升效率，也提高了匹配自由度
   >
   > 如果您的项目中使用了supported_filters=['name\_\_\*']类似的指定支持参数，需要同步更新代码如：['name\_\_.\*']
   >
   > 如果仅使用过supported_filters=['name']类的指定支持参数，则依然兼容无需更改
+
 - 更新：[controller]_build_criteria支持unsupported_filter_as_empty配置(启用时，不支持参数将导致函数返回None)
+
 - 更新：[controller]增加redirect重定向函数
+
 - 修复：[controller]支持原生falcon的raise HTTPTemporaryRedirect(...)形式重定向
+
 - 修复：[util] xmlutils的py2/py3兼容问题
+
 - 修复：[schedule] TScheduler概率丢失一个max_interval时间段定时任务问题
+
+- 修复：[middleware]falcon>=2.0 且使用wsgiref.simple_server时block问题
 
 1.3.0:
 
