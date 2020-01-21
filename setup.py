@@ -83,7 +83,7 @@ setup(
 
     description='A Falcon Base, Powerful RESTful API Framework, with SQLAlchemy integrated',
     long_description=long_description,
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
 
     # The project's main homepage.
     url='https://gitee.com/wu.jianjun/talos',
@@ -109,18 +109,13 @@ setup(
 
         'Topic :: Software Development :: Libraries',
 
-        'Framework :: Falcon',
-        'Framework :: SQLAlchemy',
-        'Framework :: Celery',
-
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.8',
 
         'Operating System :: OS Independent'
     ],
