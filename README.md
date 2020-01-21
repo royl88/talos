@@ -82,7 +82,7 @@ pip install cms-1.2.4-py2.py3-none-any.whl
 # 并确保安装gunicorn
 pip install gunicorn
 # 步骤一，导出环境变量：
-export cms_CONF=/etc/cms/cms.conf
+export CMS_CONF=/etc/cms/cms.conf
 # 步骤二，
 gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.wsgi_server:application"
 ```
@@ -95,14 +95,15 @@ gunicorn --pid "/var/run/cms.pid" --config "/etc/cms/gunicorn.py" "cms.server.ws
 
 #### 设计数据库
 
-略
+略(talos要求至少有一列唯一性，否则无法提供item型操作)
 
 #### 导出数据库模型
 
-项目中使用的是SQLAlchemy，使用表操作需要将数据库导出为python对象定义，这样做的好处是
+talos中使用的是SQLAlchemy，使用表操作需要将数据库导出为python对象定义，这样做的好处是
 
 1. 确定表结构，形成应用代码与数据库之间的版本对应
 2. 便于编程中表达数据库操作，而并非使用字符串
+3. SQLAlchemy的多数据库支持，强大的表达能力
 
 ```bash
 pip install sqlacodegen
@@ -165,7 +166,7 @@ class UserPhoneNum(Base, DictBase):
     description = Column(String(255), nullable=True)
 ```
 
-继承了这个类之后，不仅提供了转换接口json的能力，还提供了字段提取的能力，此项稍后再说明，此处不定义，则意味着默认使用表的所有字段（list和被外键引用时默认不包含外键字段），如果需要自定义字段，可以在类中配置字段提取：
+继承了这个类之后，不仅提供了转换接口json的能力，还提供了字段提取的能力，此处没有指定字段提取，则意味着默认使用表的所有字段（list和被其他表外键引用时默认不包含外键字段），如果需要自定义字段，可以在类中配置字段提取：
 
 ```python
 class User(Base, DictBase):
@@ -185,13 +186,9 @@ class User(Base, DictBase):
 > 扩展阅读：
 >
 > 一个较为常见的场景，某系统设计有数据库表如下：
->
 > User -> PhoneNum/Addresses, 一个用户对应多个电话号码以及多个地址
->
 > Tag，标签表，一个资源可对应多个标签
->
 > Region -> Tag，地域表，一个地域有多个标签
->
 > Resource -> Region/Tag，资源表，一个资源属于一个地域，一个资源有多个标签
 >
 > 用models表示大致如下：
@@ -277,10 +274,9 @@ class User(Base, DictBase):
 >         lazy=False, viewonly=True, uselist=True)
 > ```
 >
-> 如上，user作为最底层的资源，被region引用，而region又被resource使用，导致层级嵌套极多，在SQLAlchmey中，如果希望快速查询一个列表资源，一般而言我们会在relationship中加上lazy=False，这样就可以让信息在一次sql查询中加载出来，而不是每次访问外键属性再发起一次查询。问题出现在，lazy=False时sql被组合为一个SQL语句，relationship嵌套会被展开，实际数据库查询结果将是乘数级：num_resource\*num_resource_user\*num_resource_user_address\*num_resource_user_phonenum\*num_region\*num_region_user_address\*num_region_user_phonenum...
+> 如上，user作为最底层的资源，被region引用，而region又被resource使用，导致层级嵌套极多，在SQLAlchmey中，如果希望快速查询一个列表资源，一般而言我们会在relationship中加上lazy=False，这样就可以让信息在一次sql查询中加载出来，而不是每次访问外键属性再发起一次查询。问题在于，lazy=False时sql被组合为一个SQL语句，relationship每级嵌套会被展开，实际数据库查询结果将是乘数级：num_resource\*num_resource_user\*num_resource_user_address\*num_resource_user_phonenum\*num_region\*num_region_user_address\*num_region_user_phonenum...
 >
-> 导致本来resource表只有1k数量级，而本次查询结果却可能是1000 \* 1k级
->
+> 较差的情况下可能回导致resource表只有1k数量级，而本次查询结果却是1000 \* 1k级
 > 通常我们加载resource时，我们并不需要region.user、region.tags、user.addresses、user.phonenums等信息，通过指定summary_attributes来防止数据过载（需要启用CONF.dbcrud.dynamic_relationship，默认启用），这样我们得到的SQL查询是非常快速的，结果集也保持和resource一个数量级
 
 
@@ -310,7 +306,6 @@ class UserPhoneNum(ResourceBase):
 ```
 
 完成此项定义后，我们可以使用resource.User来进行用户表的增删改查，而这些功能都是ResourceBase默认提供的能力
-
 可以看到我们此处定义了orm_meta和_primary_keys两个类属性，除此以外还有更多类属性可以帮助我们快速配置应用逻辑
 
 | 类属性                          | 默认值 | 描述                                                         |
@@ -347,12 +342,12 @@ ColumnValidator可以定义的属性如下：
 | field        | 字符串                                         | 字段名称                                                     |
 | rule         | validator对象 或 校验类型rule_type所需要的参数 | 当rule是validator类型对象时，忽略 rule_type参数              |
 | rule_type    | 字符串                                         | 用于快速定义校验规则，默认regex，可选类型有callback，regex，email，phone，url，length，in，notin，integer，float，type |
-| validate_on  | 数组                                           | 校验场景和必要性, eg. ['create: M', 'update:O']，表示此字段在create函数中为必要字段，update函数中为可选字段 |
+| validate_on  | 数组                                           | 校验场景和必要性, eg. ['create: M', 'update:O']，表示此字段在create函数中为必要字段，update函数中为可选字段，也可以表示为['*:M']，表示任何情况下都是必要字段(**默认**) |
 | error_msg    | 字符串                                         | 错误提示信息，默认为'%(result)s'，即validator返回的报错信息，用户可以固定字符串或使用带有%(result)s的模板字符串 |
 | converter    | converter对象                                  | 数据转换器，当数据被校验后，可能需要转换为固定类型后才能进行编程处理，转换器可以为此提供自动转换，比如用户输入为'2018-01-01 01:01:01'字符串时间，程序需要为Datetime类型，则可以使用DateTimeConverter进行转换 |
 | orm_required | 布尔值                                         | 控制此字段是否会被传递到数据库SQL中去                        |
-| aliases      | 数组                                           | 字段的别名                                                   |
-| nullable     | 布尔值                                         | 控制此字段是否可以为None                                     |
+| aliases      | 数组                                           | 字段的别名，比如接口升级后为保留前向兼容，老字段可以作为别名指向到新名称上 |
+| nullable     | 布尔值                                         | 控制此字段是否可以为None，**默认False**                      |
 
 CRUD使用方式:
 
@@ -371,26 +366,18 @@ resource.UserPhoneNum().get(('1', '10086'))
 resource.UserPhoneNum().delete(('1', '10086'))
 ```
 
-内部查询通过组装dict来实现过滤条件，filter在表达 == 或这 in 列表时，可以直接使用一级字段即可，如name等于test：{'name': 'test'}
-
+内部查询通过组装dict来实现过滤条件，filter在表达 == 或 in 列表时，可以直接使用一级字段即可，如
+name等于test：{'name': 'test'}
 id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
 
 更复杂的查询需要通过嵌套dict来实现[^ 5]：
-
 - 简单组合：{'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}
-
 - 简单$or+组合查询：{'$or': [{'字段名称': {'过滤条件': '值'}}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}
-
 - 简单$and+组合查询：{'$and': [{'字段名称': {'过滤条件': '值'}}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}
-
 - 复杂$and+$or+组合查询：
-
   {'$and': [
-
   ​               {'$or': [{'字段名称': '值'}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}, 
-
   ​               {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}
-
   ]}
 
 | 过滤条件 | 值类型          | 含义                                                           |
@@ -413,6 +400,13 @@ id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
 | nilike    | string         | 同上，不区分大小写                                             |
 | null      | 任意           | 是NULL，等同于{'eq': None}，null主要提供HTTP API中使用                   |
 | nnull     | 任意           | 不是NULL，等同于{'ne': None}，nnull主要提供HTTP API中使用                  |
+| hasany       | string/list[string] | *JSONB专用*   包含任意key，如['a','b', 'c'] hasany ['a','d'] |
+| hasall       | string/list[string] | *JSONB专用*   包含所有key，如['a','b', 'c'] hasall ['a','c'] |
+| within       | list/dict | *JSONB专用*   被指定json包含在内                             |
+| nwithin      | list/dict | *JSONB专用*   不被指定json包含在内                           |
+| include      | list/dict | *JSONB专用*   包含指定的json                                 |
+| ninclude     | list/dict | *JSONB专用*   不包含指定的json                               |
+
 
 过滤条件可以根据不同的数据类型生成不同的查询语句，varchar类型的in是 IN ('1', '2') , inet类型的in是<<=cidr
 
@@ -449,7 +443,6 @@ GET    /v1/users/1  获取用户1的详情
 class CollectionUser(CollectionController):
     name = 'cms.users'
     resource = api.User
-
 
 class ItemUser(ItemController):
     name = 'cms.user'
@@ -1193,7 +1186,7 @@ TScheduler的动态任务仅限用户自定义的所有schedules
 
   见celery文档
 
-  截止当前2018.11.13 celery 4.2.0在定时任务中依然存在问题，使用官方建议的on_after_configure动态配置定时器时，定时任务不会被触发：[GitHub Issue 3589](https://github.com/celery/celery/issues/3589)
+  截止2018.11.13 celery 4.2.0在定时任务中依然存在问题，使用官方建议的on_after_configure动态配置定时器时，定时任务不会被触发：[GitHub Issue 3589](https://github.com/celery/celery/issues/3589)
 
   ```
   @celery.app.on_after_configure.connect
@@ -1718,27 +1711,18 @@ def get_password(value, origin_value):
 1.3.1:
 
 - 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship，默认已启用)，并可以指定load方式(默认joinedload)
-
 - 更新：[db] 支持设定获取资源detail级时下级relationship指定列表级 / 摘要级(CONF.dbcrud.detail_relationship_as_summary)
-
 - 更新：[test]动态relationship加载/装饰器/异常/缓存/导出/校验器/控制器模块等大量单元测试
-
 - 更新**[breaking]**：[controller]_build_criteria的supported_filters由fnmatch更改为re匹配方式
-
   > 由fnmatch更改为re匹配，提升效率，也提高了匹配自由度
   >
   > 如果您的项目中使用了supported_filters=['name\_\_\*']类似的指定支持参数，需要同步更新代码如：['name\_\_.\*']
   >
   > 如果仅使用过supported_filters=['name']类的指定支持参数，则依然兼容无需更改
-
 - 更新：[controller]_build_criteria支持unsupported_filter_as_empty配置(启用时，不支持参数将导致函数返回None)
-
 - 更新：[controller]增加redirect重定向函数
-
 - 修复：[controller]支持原生falcon的raise HTTPTemporaryRedirect(...)形式重定向
-
 - 修复：[util] xmlutils的py2/py3兼容问题
-
 - 修复：[schedule] TScheduler概率丢失一个max_interval时间段定时任务问题
 
 1.3.0:
