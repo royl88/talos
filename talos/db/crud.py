@@ -326,6 +326,7 @@ class ResourceBase(object):
 
     def __init__(self, session=None, transaction=None, dbpool=None, dynamic_relationship=None,
                  dynamic_load_method=None):
+
         def _first_not_none(vals):
             for v in vals:
                 if v is not None:
@@ -1000,6 +1001,7 @@ class ResourceBase(object):
                     if orm_fields:
                         record.update(orm_fields)
                     session.flush()
+                    session.refresh(record)
                     if detail:
                         after_update = record.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                     else:
