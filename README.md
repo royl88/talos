@@ -1487,6 +1487,57 @@ Linux：msgfmt --output-file=cms.mo cms.po
 
 
 
+## 日志配置
+
+### 配置指引
+
+全局日志配置为log对象，默认使用WatchedFileHandler进行日志处理，而文件则使用path配置，如果希望全局日志中使用自定义的Handler，则path参数是可选的
+
+全局日志通常可以解决大部分场景，但有时候，我们希望不同模块日志输出到不同文件中，可以使用：loggers，子日志配置器，其参数可完全参考log全局日志参数（除gunicorn_access，gunicorn_error），通过name指定捕获模块，并可以设置propagate拦截不传递到全局日志中
+
+不论全局或子级日志配置，都可以指定使用其他handler，并搭配handler_args自定义日志使用方式，指定的方式为：package.module:ClassName，默认时我们使用WatchedFileHandler，因为日志通常需要rotate，我们希望日志模块可以被无缝切割轮转而不影响应用，所以这也是我们没有将内置Handler指定为RotatingFileHandler的原因，用户需要自己使用操作系统提供的logrotate能力进行配置。
+
+以下是一个常用的日志配置，全局日志记录到server.log，而模块cms.apps.filetransfer日志则单独记录到transfer.log文件，相互不影响
+
+```json
+"log": {
+    "gunicorn_access": "./access.log",
+    "gunicorn_error": "./error.log",
+    "path": "./server.log",
+    "level": "INFO",
+    "format_string": "%(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s",
+    "date_format_string": "%Y-%m-%d %H:%M:%S",
+    "loggers": [
+        {
+            "name": "cms.apps.filetransfer",
+         	"level": "INFO",
+         	"path": "./transfer.log",
+            "propagate": false
+        }
+    ]
+}
+```
+
+
+
+其详细参数说明如下：
+
+| 路径               | 类型   | 描述                                                         | 默认值                                                       |
+| ------------------ | ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| gunicorn_access    | string | 使用gunicorn时，access日志路径                               | ./access.log                                                 |
+| gunicorn_error     | string | 使用gunicorn时，error日志路径                                | ./error.log                                                  |
+| log_console        | bool   | 是否将本日志重定向到标准输出                                 | True                                                         |
+| path               | string | 日志路径，默认使用WatchedFileHandler，当指定handler时此项无效 | ./server.log                                                 |
+| level              | string | 日志级别(ERROR，WARNING，INFO，DEBUG)                        | INFO                                                         |
+| handler            | string | 自定义的Logger类，eg: logging.handlers:SysLogHandler，定义此项后会优先使用并忽略默认的log.path参数，需要使用handler_args进行日志初始化参数定义 |                                                              |
+| handler_args       | list   | 自定义的Logger类的初始化参数，eg: []                         | []                                                           |
+| format_string      | string | 日志字段配置                                                 | %(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s |
+| date_format_string | string | 日志时间格式                                                 | %Y-%m-%d %H:%M:%S                                            |
+| name               | string | 全局log中无此参数，仅用于loggers子日志配置器上，表示捕获的日志模块路径 |                                                              |
+| propagate          | bool   | 全局log中无此参数，仅用于loggers子日志配置器上，表示日志是否传递到上一级日志输出 | True                                                         |
+
+
+
 ## 工具库
 
 ### 带宽限速
@@ -1654,8 +1705,8 @@ def get_password(value, origin_value):
 | log.gunicorn_error                     | string | gunicorn的error日志路径                                      | ./error.log                                                  |
 | log.path                               | string | 全局日志路径，默认使用WatchedFileHandler，当指定handler时此项无效 | ./server.log                                                 |
 | log.level                              | string | 日志级别                                                     | INFO                                                         |
-| log.handler[^ 7]                       | string | 定义的Logger类，eg: logging.handlers:SysLogHandler，定义此项后会优先使用并忽略默认的log.path |                                                              |
-| log.handler_args[^ 7]                  | list   | 定义的Logger类的初始化参数，eg: []                           |                                                              |
+| log.handler[^ 7]                       | string | 自定义的Logger类，eg: logging.handlers:SysLogHandler，定义此项后会优先使用并忽略默认的log.path |                                                              |
+| log.handler_args[^ 7]                  | list   | 自定义的Logger类的初始化参数，eg: []                         |                                                              |
 | log.format_string                      | string | 日志字段配置                                                 | %(asctime)s.%(msecs)03d %(process)d %(levelname)s %(name)s:%(lineno)d [-] %(message)s |
 | log.date_format_string                 | string | 日志时间格式                                                 | %Y-%m-%d %H:%M:%S                                            |
 | log.loggers                            | list   | 模块独立日志配置，列表每个元素是dict: [{"name": "cms.test.api", "path": "api.log"}] |                                                              |
@@ -1664,7 +1715,7 @@ def get_password(value, origin_value):
 | log.loggers.path                       | string | 参考log.path                                                 |                                                              |
 | log.loggers.handler[^ 7]               | string | 参考log.handler                                              |                                                              |
 | log.loggers.handler_args[^ 7]          | list   | 参考log.handler_args                                         |                                                              |
-| log.loggers.propagate[^ 7]             | bool   | 参考log.propagate                                            |                                                              |
+| log.loggers.propagate[^ 7]             | bool   | 是否传递到上一级日志配置                                     |                                                              |
 | log.loggers.log_console[^ 7]           | bool   | 参考log.log_console                                          |                                                              |
 | log.loggers.format_string[^ 7]         | string | 参考log.format_string                                        |                                                              |
 | log.loggers.date_format_string[^ 7]    | string | 参考log.date_format_string                                   |                                                              |
