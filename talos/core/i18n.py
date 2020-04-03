@@ -6,6 +6,7 @@
 
 from __future__ import absolute_import
 
+import collections
 import gettext
 import logging
 from talos.core import utils
@@ -22,7 +23,7 @@ class Translator():
 
     def __init__(self):
         self.default_language = None
-        self._translation_maps = {}
+        self._translation_maps = collections.OrderedDict()
 
     def __call__(self, value):
         if self._translation_maps and self.default_language:
@@ -33,12 +34,12 @@ class Translator():
     def setup(self, app, locales, lang):
         # 清除成员信息以支持多次初始化
         self.default_language = None
-        self._translation_maps = {}
+        self._translation_maps = collections.OrderedDict()
         if utils.is_list_type(lang):
             if len(lang) == 0:
                 LOG.warning('language(%s) files not found, no translation will be used', lang)
             for l in lang:
-                find_mo = gettext.find("makaira",
+                find_mo = gettext.find(app,
                                     localedir=locales,
                                     languages=[l])
                 if find_mo:
