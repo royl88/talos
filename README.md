@@ -1759,6 +1759,11 @@ def get_password(value, origin_value):
 
 ## CHANGELOG
 
+1.3.2:
+
+- 更新：[i18n] 支持多语言包加载，并默认第一语言（language: [en, zh, zh-CN,...]）
+- 修复：[crud] update relationship后返回的对象不是最新信息问题
+
 1.3.1:
 
 - 更新：[db] models动态relationship加载，效率提升(CONF.dbcrud.dynamic_relationship，默认已启用)，并可以指定load方式(默认joinedload)
