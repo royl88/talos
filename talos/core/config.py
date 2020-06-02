@@ -55,9 +55,9 @@ def _simple_expr(keys):
     return 'CONF.' + '.'.join([k['name'] for k in keys])
 
 
-def _validate(data, kyes=None):
+def _validate(data, keys=None):
     for key, value in data.items():
-        allkeys = copy.deepcopy(kyes) if kyes else []
+        allkeys = keys[:] if keys else []
         o_key = {'name': key, 'attr_type': True}
         allkeys.append(o_key)
         if key.startswith('${') and key.endswith('}'):
@@ -70,7 +70,7 @@ def _validate(data, kyes=None):
                 o_key['attr_type'] = False
                 warnings.warn('[config] access %s instead of %s' % (_valid_expr(allkeys), _simple_expr(allkeys)), SyntaxWarning)
         if isinstance(value, Mapping):
-            _validate(value, kyes=allkeys)
+            _validate(value, keys=allkeys)
                 
 
 class Config(Mapping):
@@ -86,24 +86,27 @@ class Config(Mapping):
     无法通过CONF.my_config.from_files来访问属性，需要稍作转换：CONF.my_config['from_files'].a.b 如此来获取
     """
 
-    def __init__(self, opts, raise_not_exist=True):
+    def __init__(self, opts, raise_not_exist=True, check_reserved=False):
         self._opts = opts or {}
-        _validate(self._opts)
+        if check_reserved:
+            _validate(self._opts)
         self._raise_not_exist = raise_not_exist
 
-    def set_options(self, opts):
+    def set_options(self, opts, check_reserved=False):
         self._opts = opts or {}
-        _validate(self._opts)
+        if check_reserved:
+            _validate(self._opts)
 
     def __repr__(self):
         return '<Config(%s, raise_not_exist=%s)>' % (str(self._opts), self._raise_not_exist)
 
-    def __call__(self, opts):
+    def __call__(self, opts, check_reserved=False):
         """用另外一个opts来重新初始化自己"""
         self._opts = opts or {}
-        _validate(self._opts)
+        if check_reserved:
+            _validate(self._opts)
 
-    def from_files(self, opt_files, ignore_undefined):
+    def from_files(self, opt_files, ignore_undefined, check_reserved=False):
         """
         载入配置文件，并按照顺序进行合并配置项，如果配置项合并后依然是UNSET，则抛ValueError异常提示用户
 
@@ -136,7 +139,8 @@ class Config(Mapping):
         for opt_file in opt_files:
             with open(opt_file, 'r') as f:
                 _update(self._opts, json.load(f), ignore_undefined)
-        _validate(self._opts)
+        if check_reserved:
+            _validate(self._opts)
 
     def __getattr__(self, name):
         """
@@ -240,7 +244,7 @@ def setup(path, default_opts=None, dir_path=None, ignore_undefined=False):
         s_opts = json.dumps(opts)
         tpl = Template(s_opts, strict_undefined=True)
         ref = Config(json.loads(tpl.render(**context)))
-    CONF(ref.to_dict())
+    CONF(ref.to_dict(), check_reserved=True)
 
 
 # 程序所需的最小配置项

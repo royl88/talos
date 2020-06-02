@@ -729,7 +729,7 @@ class ResourceBase(object):
         :returns: 默认过滤条件
         :rtype: dict
         """
-        return copy.deepcopy(self._default_filter)
+        return copy.deepcopy(self._default_filter) if self._default_filter else {}
 
     @property
     def default_order(self):
