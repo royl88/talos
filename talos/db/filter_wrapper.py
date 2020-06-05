@@ -26,6 +26,25 @@ from talos.core import utils
 RE_CIDR = re.compile(r'^(\d{1,3}\.){0,3}\d{1,3}/\d{1,2}$')
 RE_IP = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
 RE_CIDR_LIKE = re.compile(r'^(\d{1,3}|\d{1,3}\.\d{1,3}|\d{1,3}\.\d{1,3}\.\d{1,3})(\.)?(/\d{1,2})?$')
+_FILTER_REGISTER = {}
+
+
+def register_filter(type_name, filterobj, override=True):
+    if type_name in _FILTER_REGISTER and override:
+        _FILTER_REGISTER[type_name] = filterobj
+    else:
+        _FILTER_REGISTER.setdefault(type_name, filterobj)
+
+
+def get_filter_map():
+    return _FILTER_REGISTER
+
+
+def get_filter(type_name, default_type=None):
+    if type_name in _FILTER_REGISTER:
+        return _FILTER_REGISTER[type_name]
+    else:
+        return _FILTER_REGISTER[default_type]
 
 
 def column_from_expression(table, expression):
@@ -531,4 +550,18 @@ class FilterJSON(Filter):
         return expr
 
 
+# datetime支持大小比较，不支持模糊，与Number相同
 FilterDateTime = FilterNumber
+# 注册默认类型
+register_filter(None, Filter())
+register_filter('inet', FilterNetwork())
+register_filter('cidr', FilterNetwork())
+register_filter('small_integer', FilterNumber())
+register_filter('integer', FilterNumber())
+register_filter('big_integer', FilterNumber())
+register_filter('numeric', FilterNumber())
+register_filter('float', FilterNumber())
+register_filter('date', FilterDateTime())
+register_filter('datetime', FilterDateTime())
+register_filter('boolean', FilterBool())
+register_filter('jsonb', FilterJSON())

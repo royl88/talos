@@ -341,22 +341,6 @@ class ResourceBase(object):
         self._session = session
         self._transaction = transaction
 
-    def _filter_hander_mapping(self):
-        handlers = {
-            'inet': filter_wrapper.FilterNetwork(),
-            'cidr': filter_wrapper.FilterNetwork(),
-            'small_integer': filter_wrapper.FilterNumber(),
-            'integer': filter_wrapper.FilterNumber(),
-            'big_integer': filter_wrapper.FilterNumber(),
-            'numeric': filter_wrapper.FilterNumber(),
-            'float': filter_wrapper.FilterNumber(),
-            'date': filter_wrapper.FilterDateTime(),
-            'datetime': filter_wrapper.FilterDateTime(),
-            'boolean': filter_wrapper.FilterBool(),
-            'jsonb': filter_wrapper.FilterJSON(),
-        }
-        return handlers
-
     def _filter_key_mapping(self):
         keys = {
             '$or': or_,
@@ -365,8 +349,7 @@ class ResourceBase(object):
         return keys
 
     def _get_filter_handler(self, name):
-        handlers = self._filter_hander_mapping()
-        return handlers.get(name.lower(), filter_wrapper.Filter())
+        return filter_wrapper.get_filter(name.lower())
 
     def _apply_filters(self, query, orm_meta, filters=None, orders=None):
 
