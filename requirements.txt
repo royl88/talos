@@ -9,6 +9,5 @@ ipaddress
 mako
 requests
 limits
-psutil
 celery
 dogpile.cache
