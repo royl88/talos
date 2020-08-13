@@ -25,7 +25,6 @@ import six
 
 class ComplexEncoder(json.JSONEncoder):
     """加强版的JSON Encoder，支持日期、日期+时间类型的转换"""
-
     def default(self, obj):
         # fix, 不要使用strftime，当超过1900年时会报错
         if isinstance(obj, datetime.datetime):
@@ -98,7 +97,7 @@ def get_function_name():
     :returns: 当前函数名
     :rtype: string
     """
-    return inspect.stack()[1][3]
+    return inspect.stack(0)[1][3]
 
 
 def walk_dir(dir_path, pattern):
@@ -218,10 +217,11 @@ def bool_from_string(subject, strict=False, default=False):
     elif lowered in FALSE_STRINGS:
         return False
     elif strict:
-        acceptable = ', '.join(
-            "'%s'" % s for s in sorted(TRUE_STRINGS + FALSE_STRINGS))
-        msg = "Unrecognized value '%(val)s', acceptable values are: %(acceptable)s" % {'val': subject,
-                                                                                       'acceptable': acceptable}
+        acceptable = ', '.join("'%s'" % s for s in sorted(TRUE_STRINGS + FALSE_STRINGS))
+        msg = "Unrecognized value '%(val)s', acceptable values are: %(acceptable)s" % {
+            'val': subject,
+            'acceptable': acceptable
+        }
         raise ValueError(msg)
     else:
         return default
@@ -362,7 +362,6 @@ def get_item(data, expr, delimiter='.', default=None):
     :param default:   如果表达式的值不存在，则返回默认值
     :type default:    any
     '''
-
     class _NotExist(object):
         pass
 
