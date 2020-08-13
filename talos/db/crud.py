@@ -10,6 +10,7 @@ import collections
 import contextlib
 import copy
 import logging
+import warnings
 
 import six
 from sqlalchemy import text, and_, or_
@@ -118,8 +119,8 @@ class ColumnValidator(object):
                 types = self.rule
                 self.rule = validator.TypeValidator(*types)
             else:
-                raise exceptions.CriticalError(msg=utils.format_kwstring(
-                    _('no support for rule_type: %(rule)s'), rule=str(self.rule_type)))
+                raise exceptions.CriticalError(
+                    msg=utils.format_kwstring(_('no support for rule_type: %(rule)s'), rule=str(self.rule_type)))
 
     def _build_situation(self, situations):
         result = {}
@@ -199,8 +200,8 @@ class ColumnValidator(object):
             return self.converter.convert(value)
         return value
 
-    @staticmethod
-    def get_clean_data(validate, data, situation, orm_required=False):
+    @classmethod
+    def get_clean_data(cls, validate, data, situation, orm_required=False, data_validation=True):
         """
         将数据经过验证，返回符合条件的数据
 
@@ -212,6 +213,8 @@ class ColumnValidator(object):
         :type situation: str
         :param orm_required: 是否过滤出符合ORM初始化数据
         :type orm_required: boolean
+        :param data_validation: 是否校验数据合理性
+        :type data_validation: boolean
         :returns: 通过验证后的干净数据
         :rtype: dict
         :raises: exception.UnknownValidationError, exception.FieldRequired
@@ -234,16 +237,22 @@ class ColumnValidator(object):
                             field_value = data[field]
                             break
                 if field_name is not None:
-                    try:
-                        result = col.validate(field_value)
-                    except Exception as e:
-                        raise exceptions.CriticalError(msg=utils.format_kwstring(
-                            _('validate failed on field: %(field)s with data: %(data)s, exception info: %(exception)s'),
-                            field=field_name_display,
-                            data=data,
-                            exception=str(e)))
+                    result = True
+                    if data_validation:
+                        try:
+                            result = col.validate(field_value)
+                        except Exception as e:
+                            raise exceptions.ValidationError(message=utils.format_kwstring(_(
+                                'validate failed on field: %(field)s with data: %(data)s, exception info: %(exception)s'
+                            ),
+                                                                                           field=field_name_display,
+                                                                                           data=data,
+                                                                                           exception=str(e)))
                     if result is True:
-                        clean_data[field_name] = col.convert(field_value)
+                        # add clean_data when validate true
+                        # and check if user needed orm_required only
+                        if (orm_required and col.orm_required) or (not orm_required):
+                            clean_data[field_name] = col.convert(field_value)
                     else:
                         raise exceptions.ValidationError(attribute=field_name_display, msg=result)
                 else:
@@ -251,41 +260,15 @@ class ColumnValidator(object):
                         raise exceptions.FieldRequired(attribute=col.field)
         return clean_data
 
-    @staticmethod
-    def any_orm_data(validate, data, situation):
+    @classmethod
+    def any_orm_data(cls, validate, data, situation):
         """
         无需验证数据(但会验证字段是否缺失)，返回orm所需数据
-
-        :param validate: 验证配置
-        :type validate: list
-        :param data: 用户传入数据
-        :type data: dict
-        :param situation: 验证场景，根据create，update传入目前只有['create', 'update']可选
-        :type situation: str
-        :returns: 通过过滤后的干净数据
-        :rtype: dict
-        :raises: exception.FieldRequired
         """
-        clean_data = {}
-        for col in validate:
-            if col.in_situation(situation):
-                field_name = None
-                field_value = None
-                if col.field in data:
-                    field_name = col.field
-                    field_value = data[col.field]
-                else:
-                    for field in col.aliases:
-                        if field in data:
-                            field_name = col.field
-                            field_value = data[field]
-                            break
-                if field_name is not None:
-                    clean_data[field_name] = col.convert(field_value)
-                else:
-                    if col.is_required(situation):
-                        raise exceptions.FieldRequired(attribute=col.field)
-        return clean_data
+        warnings.warn(
+            'ColumnValidator.any_orm_data will be removed in version 1.3.5, use ColumnValidator.get_clean_data instead',
+            DeprecationWarning)
+        return cls.get_clean_data(validate, data, situation, orm_required=True, data_validation=False)
 
 
 class ResourceBase(object):
@@ -324,9 +307,12 @@ class ResourceBase(object):
     # converter，对象实例，converter中的类型，可以自定义
     _validate = []
 
-    def __init__(self, session=None, transaction=None, dbpool=None, dynamic_relationship=None,
+    def __init__(self,
+                 session=None,
+                 transaction=None,
+                 dbpool=None,
+                 dynamic_relationship=None,
                  dynamic_load_method=None):
-
         def _first_not_none(vals):
             for v in vals:
                 if v is not None:
@@ -352,7 +338,6 @@ class ResourceBase(object):
         return filter_wrapper.get_filter(name.lower())
 
     def _apply_filters(self, query, orm_meta, filters=None, orders=None):
-
         def _extract_column_visit_name(column):
             '''
             获取列名称
@@ -540,11 +525,9 @@ class ResourceBase(object):
             'joinedload': sqlalchemy.orm.joinedload,
             'subqueryload': sqlalchemy.orm.subqueryload,
             'selectinload': sqlalchemy.orm.selectinload,
-            'immediateload':  sqlalchemy.orm.immediateload}
-        level_map = {
-            3: 'get_columns',
-            2: 'list_columns',
-            1: 'sum_columns'}
+            'immediateload': sqlalchemy.orm.immediateload
+        }
+        level_map = {3: 'get_columns', 2: 'list_columns', 1: 'sum_columns'}
         attributes = getattr(orm_meta(), level_map[level], None)()
         if relationship_cols:
             for rel_col_name in relationship_cols:
@@ -572,10 +555,10 @@ class ResourceBase(object):
                     else:
                         next_level = level - 1
                     query = self._dynamic_relationship_load(query,
-                                                     orm_meta=col.property.entity.entity,
-                                                     level=next_level,
-                                                     parent=parent_next,
-                                                     fallback_raise=fallback_raise)
+                                                            orm_meta=col.property.entity.entity,
+                                                            level=next_level,
+                                                            parent=parent_next,
+                                                            fallback_raise=fallback_raise)
                 else:
                     # FIXME: (wujj)remove this, debug msg
                     load_msg = 'dynamic relationship raise load: '
@@ -597,8 +580,15 @@ class ResourceBase(object):
                             query = query.options(sqlalchemy.orm.lazyload(col))
         return query
 
-    def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False,
-                   dynamic_relationship=None, level_of_relationship=2):
+    def _get_query(self,
+                   session,
+                   orm_meta=None,
+                   filters=None,
+                   orders=None,
+                   joins=None,
+                   ignore_default=False,
+                   dynamic_relationship=None,
+                   level_of_relationship=2):
         """获取一个query对象，这个对象已经应用了filter，可以确保查询的数据只包含我们感兴趣的数据，常用于过滤已被删除的数据
 
         :param session: session对象
@@ -637,8 +627,8 @@ class ResourceBase(object):
         tables = list(ex_tables)
         tables.insert(0, orm_meta)
         if orm_meta is None:
-            raise exceptions.CriticalError(msg=utils.format_kwstring(
-                _('%(name)s.orm_meta can not be None'), name=self.__class__.__name__))
+            raise exceptions.CriticalError(
+                msg=utils.format_kwstring(_('%(name)s.orm_meta can not be None'), name=self.__class__.__name__))
         query = session.query(*tables)
         if len(ex_tables) > 0:
             for item in joins:
@@ -647,8 +637,7 @@ class ResourceBase(object):
                     spec_args.append(and_(*item['conditions']))
                 else:
                     spec_args.extend(item['conditions'])
-                query = query.join(*spec_args,
-                                   isouter=item.get('isouter', True))
+                query = query.join(*spec_args, isouter=item.get('isouter', True))
         query = self._apply_filters(query, orm_meta, filters, orders)
         # 如果不是忽略default模式，default_filter必须进行过滤
         if not ignore_default:
@@ -662,8 +651,10 @@ class ResourceBase(object):
         keys = self.primary_keys
         if utils.is_list_type(keys) and utils.is_list_type(rid):
             if len(rid) != len(keys):
-                raise exceptions.CriticalError(msg=utils.format_kwstring(
-                    _('primary key length not match! require: %(length_require)d, input: %(length_input)d'), length_require=len(keys), length_input=len(rid)))
+                raise exceptions.CriticalError(msg=utils.format_kwstring(_(
+                    'primary key length not match! require: %(length_require)d, input: %(length_input)d'),
+                                                                         length_require=len(keys),
+                                                                         length_input=len(rid)))
             for idx, val in enumerate(rid):
                 query = query.filter(getattr(self.orm_meta, keys[idx]) == val)
         elif utils.is_string_type(keys) and utils.is_list_type(rid) and len(rid) == 1:
@@ -673,8 +664,8 @@ class ResourceBase(object):
         elif utils.is_string_type(keys) and not utils.is_list_type(rid):
             query = query.filter(getattr(self.orm_meta, keys) == rid)
         else:
-            raise exceptions.CriticalError(msg=utils.format_kwstring(
-                _('primary key not match! require: %(keys)s'), keys=keys))
+            raise exceptions.CriticalError(
+                msg=utils.format_kwstring(_('primary key not match! require: %(keys)s'), keys=keys))
         return query
 
     @classmethod
@@ -700,7 +691,11 @@ class ResourceBase(object):
         """
         rule = rule or cls._validate
         if not validate:
-            return ColumnValidator.any_orm_data(rule, data, situation)
+            return ColumnValidator.get_clean_data(rule,
+                                                  data,
+                                                  situation,
+                                                  orm_required=orm_required,
+                                                  data_validation=False)
         else:
             return ColumnValidator.get_clean_data(rule, data, situation, orm_required=orm_required)
 
@@ -775,12 +770,29 @@ class ResourceBase(object):
 
     @classmethod
     def extract_validate_fileds(cls, data):
+        '''
+        ColumnValidator总是会根据场景进行字段的存在性校验[可选合理性校验]
+        本函数提供了不校验场景&存在性&合理性的纯key-value的提取式函数（不推荐）
+        '''
+        # TODO: (wujj)remove deprecated function
+        warnings.warn('ResourceBase.extract_validate_fileds will be removed in version 1.3.5', DeprecationWarning)
         if data is None:
             return None
         new_data = {}
-        for validator in cls._validate:
-            if validator.field in data:
-                new_data[validator.field] = data[validator.field]
+        for col in cls._validate:
+            field_name = None
+            field_value = None
+            if col.field in data:
+                field_name = col.field
+                field_value = data[col.field]
+            else:
+                for field in col.aliases:
+                    if field in data:
+                        field_name = col.field
+                        field_value = data[field]
+                        break
+            if field_name is not None:
+                new_data[field_name] = field_value
         return new_data
 
     @contextlib.contextmanager
@@ -823,8 +835,7 @@ class ResourceBase(object):
         """
         offset = offset or 0
         with self.get_session() as session:
-            query = self._get_query(session, filters=filters, orders=[],
-                                    dynamic_relationship=False)
+            query = self._get_query(session, filters=filters, orders=[], dynamic_relationship=False)
             if hooks:
                 for h in hooks:
                     query = h(query, filters)
@@ -917,14 +928,15 @@ class ResourceBase(object):
             orm_fields = self.validate(resource, utils.get_function_name(), orm_required=True, validate=False)
         with self.transaction() as session:
             try:
+                # pylint:disable=not-callable
                 item = self.orm_meta(**orm_fields)
                 session.add(item)
                 session.flush()
                 self._addtional_create(session, all_fields, item.to_dict())
+                session.refresh(item)
                 if detail:
                     return item.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
-                else:
-                    return item.to_dict()
+                return item.to_dict()
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
@@ -984,12 +996,12 @@ class ResourceBase(object):
                     if orm_fields:
                         record.update(orm_fields)
                     session.flush()
+                    self._addtional_update(session, rid, all_fields, before_update, after_update)
                     session.refresh(record)
                     if detail:
                         after_update = record.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                     else:
                         after_update = record.to_dict()
-                    self._addtional_update(session, rid, all_fields, before_update, after_update)
                 else:
                     after_update = before_update
                 return before_update, after_update
