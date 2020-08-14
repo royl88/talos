@@ -18,6 +18,8 @@ import os
 import random
 import re
 import socket
+import sys
+import traceback
 import uuid
 
 import six
@@ -92,12 +94,101 @@ def generate_salt(length=32):
 
 def get_function_name():
     """
-    获取当前函数名
+    获取当前函数名, 以下是收集的各项获取当前函数名称的各种方式，相对于其他处理此类操作较慢
+    # coding=utf-8
+    import inspect
+    import sys
+    import time
+    import traceback
+
+    def deeper(func, depth):
+        if depth > 0:
+            return deeper(func, depth - 1)
+        else:
+            return func()
+
+    def no_stack():
+        # do no inspection, measure the cost of deeper()
+        return "deeper"
+
+    def show_stack():
+        name = inspect.stack()[1][3]
+        return name
+
+
+    def show_stack_zero():
+        name = inspect.stack(0)[1][3]
+        return name
+
+    def show_trace():
+        frame = traceback.extract_stack()[-2]
+        name = getattr(frame, 'name', frame[2])
+        return name
+
+    def show_limit():
+        frame = traceback.extract_stack(limit=2)[-2]
+        name = getattr(frame, 'name', frame[2])
+        return name
+
+    def sys_traceback():
+        frame = sys._getframe().f_back
+        frame_info = traceback.extract_stack(f=frame, limit=1)[0]
+        name = getattr(frame_info, 'name', frame_info[2])
+        return name
+
+    def sys_inspect():
+        frame = sys._getframe().f_back
+        name = inspect.getframeinfo(frame)[2]
+        return name
+
+    def inspect_inspect():
+        frame = inspect.currentframe().f_back
+        name = inspect.getframeinfo(frame)[2]
+        return name
+
+    def measure_time(func, repeat=1000, stack=10):
+        total = 0
+        name = None
+        for _ in range(repeat):
+            start = time.time()
+            name = deeper(func, stack)
+            span = time.time() - start
+            total = total + span
+        print(name, "repeat:{0} stack:{1} cost:{2:.2f} sec".format(repeat, stack, total))
+
+    print('no measurement')
+    measure_time(no_stack)
+    measure_time(no_stack, stack=20)
+    print('inspect.stack (run 10% as many times, because slow)')
+    measure_time(show_stack, repeat=100)
+    measure_time(show_stack, repeat=100, stack=100)
+    print('inspect.stack(0) (run 10% as many times, because slow)')
+    measure_time(show_stack_zero, repeat=100)
+    measure_time(show_stack_zero, repeat=100, stack=100)
+    print('traceback.extract_stack')
+    measure_time(show_trace)
+    measure_time(show_trace, stack=100)
+    print('traceback.extract_stack + limit')
+    measure_time(show_limit)
+    measure_time(show_limit, stack=100)
+    print('sys.getframe + traceback')
+    measure_time(sys_traceback)
+    measure_time(sys_traceback, stack=100)
+    print('sys.getframe + inspect')
+    measure_time(sys_inspect)
+    measure_time(sys_inspect, stack=100)
+    print('inspect.currentframe + inspect')
+    measure_time(inspect_inspect)
+    measure_time(inspect_inspect, stack=100)
 
     :returns: 当前函数名
     :rtype: string
     """
-    return inspect.stack(0)[1][3]
+    frame = sys._getframe().f_back
+    frame_info = traceback.extract_stack(f=frame, limit=1)[0]
+    name = getattr(frame_info, 'name', frame_info[2])
+    return name
+    # return inspect.stack(0)[1][3]
 
 
 def walk_dir(dir_path, pattern):
