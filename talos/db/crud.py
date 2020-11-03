@@ -291,6 +291,9 @@ class ResourceBase(object):
     # get获取信息时，默认根据detail->list->summary层级依次进行取值(取决于全局配置)
     # 如果希望本资源get获取到的第一层级外键是summary级，则设置为True
     _detail_relationship_as_summary = None
+    # 当发生数据库异常时，是否抛出带有数据库细节的异常信息，默认False
+    # False仅返回数据冲突错误，True可能会暴露数据库表名，字段，约束等细节内容
+    _db_exception_detail = False
     # 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表
     _primary_keys = 'id'
     # 默认过滤查询，应用于每次查询本类资源，此处应当是静态数据，不可被更改
@@ -587,6 +590,7 @@ class ResourceBase(object):
                    orders=None,
                    joins=None,
                    ignore_default=False,
+                   ignore_default_orders=False,
                    dynamic_relationship=None,
                    level_of_relationship=2):
         """获取一个query对象，这个对象已经应用了filter，可以确保查询的数据只包含我们感兴趣的数据，常用于过滤已被删除的数据
@@ -602,8 +606,10 @@ class ResourceBase(object):
         :type orders: list
         :param joins: 指定动态join,eg.[{'table': model, 'conditions': [model_a.col_1 == model_b.col_1]}]
         :type joins: list
-        :param ignore_default: 是否忽略默认的类指定的filters及orders
-        :type ignore_default: list
+        :param ignore_default: 是否忽略默认的类指定的filters
+        :type ignore_default: bool
+        :param ignore_default_orders: 是否忽略默认的类指定的orders
+        :type ignore_default_orders: bool
         :param dynamic_relationship: 是否使用动态外键加载方式，None代表依次使用实例指定/类指定/配置指定
         :type dynamic_relationship: bool/None
         :param level_of_relationship: 初始加载的字段级别，1:summary, 2: list, 3: detail
@@ -614,13 +620,11 @@ class ResourceBase(object):
         """
         orm_meta = orm_meta or self.orm_meta
         filters = filters or {}
+        orders = orders or []
         # orders优先使用用户传递排序
         orders = copy.copy(orders)
-        if orders is None:
-            orders = self.default_order
-        else:
-            if not ignore_default:
-                orders.extend(self.default_order)
+        if not ignore_default_orders:
+            orders.extend(self.default_order)
 
         joins = joins or []
         ex_tables = [item['table'] for item in joins]
@@ -835,7 +839,11 @@ class ResourceBase(object):
         """
         offset = offset or 0
         with self.get_session() as session:
-            query = self._get_query(session, filters=filters, orders=[], dynamic_relationship=False)
+            query = self._get_query(session,
+                                    filters=filters,
+                                    orders=[],
+                                    ignore_default_orders=True,
+                                    dynamic_relationship=False)
             if hooks:
                 for h in hooks:
                     query = h(query, filters)
@@ -940,9 +948,13 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
 
         # with statement will commit or rollback for user
@@ -979,9 +991,9 @@ class ResourceBase(object):
         with self.transaction() as session:
             try:
                 if detail:
-                    query = self._get_query(session, level_of_relationship=3)
+                    query = self._get_query(session, ignore_default_orders=True, level_of_relationship=3)
                 else:
-                    query = self._get_query(session)
+                    query = self._get_query(session, ignore_default_orders=True)
                 query = self._apply_primary_key_filter(query, rid)
                 if filters:
                     query = self._apply_filters(query, self.orm_meta, filters)
@@ -1008,9 +1020,13 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
 
     def _before_delete(self, rid):
@@ -1032,9 +1048,9 @@ class ResourceBase(object):
         with self.transaction() as session:
             try:
                 if detail:
-                    query = self._get_query(session, orders=[], level_of_relationship=3)
+                    query = self._get_query(session, orders=[], ignore_default_orders=True, level_of_relationship=3)
                 else:
-                    query = self._get_query(session, orders=[])
+                    query = self._get_query(session, orders=[], ignore_default_orders=True)
                 query = self._apply_primary_key_filter(query, rid)
                 if filters:
                     query = self._apply_filters(query, self.orm_meta, filters)
@@ -1053,9 +1069,13 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
 
     def _before_delete_all(self, filters):
@@ -1077,7 +1097,7 @@ class ResourceBase(object):
         self._before_delete_all(filters)
         with self.transaction() as session:
             try:
-                query = self._get_query(session, orders=[], filters=filters)
+                query = self._get_query(session, orders=[], ignore_default_orders=True, filters=filters)
                 records = query.all()
                 count = 0
                 records = [rec.to_dict() for rec in records]
@@ -1090,7 +1110,11 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
