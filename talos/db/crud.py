@@ -291,6 +291,9 @@ class ResourceBase(object):
     # get获取信息时，默认根据detail->list->summary层级依次进行取值(取决于全局配置)
     # 如果希望本资源get获取到的第一层级外键是summary级，则设置为True
     _detail_relationship_as_summary = None
+    # 当发生数据库异常时，是否抛出带有数据库细节的异常信息，默认False
+    # False仅返回数据冲突错误，True可能会暴露数据库表名，字段，约束等细节内容
+    _db_exception_detail = False
     # 表对应的主键列，单个主键时，使用字符串，多个联合主键时为字符串列表
     _primary_keys = 'id'
     # 默认过滤查询，应用于每次查询本类资源，此处应当是静态数据，不可被更改
@@ -940,9 +943,13 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
 
         # with statement will commit or rollback for user
@@ -1008,9 +1015,13 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
 
     def _before_delete(self, rid):
@@ -1053,9 +1064,13 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
 
     def _before_delete_all(self, filters):
@@ -1090,7 +1105,11 @@ class ResourceBase(object):
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.ConflictError(message=str(e))
                 raise exceptions.ConflictError(msg=_('can not meet the constraints'))
             except sqlalchemy.exc.SQLAlchemyError as e:
                 LOG.exception(e)
+                if self._db_exception_detail:
+                    raise exceptions.DBError(message=str(e))
                 raise exceptions.DBError(msg=_('unknown db error'))
