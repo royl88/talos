@@ -1759,6 +1759,14 @@ def get_password(value, origin_value):
 
 ## CHANGELOG
 
+1.3.3:
+
+- 更新：[config] 优化config.item效率
+- 更新：[crud] 优化deepcopy导致的效率问题
+- 更新：[utils] 优化utils.get_function_name效率
+- 更新：[crud] 提供register_filter支持外部filter注册
+- 修复：[crud] any_orm_data返回字段不正确问题
+
 1.3.2:
 
 - 更新：[i18n] 支持多语言包加载，并默认第一语言（language: [en, zh, zh-CN,...]）

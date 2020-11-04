@@ -1,6 +1,7 @@
 # coding=utf-8
 """
 包装了命令执行模块，支持超时设置，超时可强制kill进程及子进程
+pip install psuitl
 """
 
 from __future__ import absolute_import
@@ -31,11 +32,8 @@ def exec_command(command, timeout=None, raise_error=False, **kwargs):
                 pass
         except psutil.Error as e:
             LOG.exception(e)
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        **kwargs)
+
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, **kwargs)
     if timeout:
         waiter = threading.Timer(timeout, timeout_callback, (process, command))
         waiter.start()
@@ -45,10 +43,11 @@ def exec_command(command, timeout=None, raise_error=False, **kwargs):
         waiter.cancel()
     if retcode:
         LOG.error(_('Command %(command)s exited with %(retcode)s'
-                    '- %(output)s'),
-                  {'command': command,
-                   'retcode': retcode,
-                   'output': output})
+                    '- %(output)s'), {
+                        'command': command,
+                        'retcode': retcode,
+                        'output': output
+                    })
         if raise_error:
             e = subprocess.CalledProcessError(retcode, command)
             e.output = output
