@@ -15,7 +15,7 @@ https://gitee.com/wu.jianjun/talos/tree/master/release
 * 基于falcon，高效
 * 使用SQLAlchemy作为数据库后端，快速切换数据库
 * 项目生成工具
-* 快速RESTfult CRUD API开发
+* 快速RESTful CRUD API开发
 * filters，pagination，orders支持
 * validation数据校验
 * 异步任务集成[celery]
@@ -1758,6 +1758,12 @@ def get_password(value, origin_value):
 
 
 ## CHANGELOG
+
+1.3.5:
+- 修复：[crud] _addtional_update的after_update参数取值无效问题
+
+1.3.4:
+- 修复：[crud] update & delete时带入default_orders报错问题
 
 1.3.3:
 
