@@ -1008,14 +1008,12 @@ class ResourceBase(object):
                     if orm_fields:
                         record.update(orm_fields)
                     session.flush()
-                    self._addtional_update(session, rid, all_fields, before_update, after_update)
                     session.refresh(record)
                     if detail:
                         after_update = record.to_detail_dict(child_as_summary=self._detail_relationship_as_summary)
                     else:
                         after_update = record.to_dict()
-                else:
-                    after_update = before_update
+                    self._addtional_update(session, rid, all_fields, before_update, after_update)
                 return before_update, after_update
             except sqlalchemy.exc.IntegrityError as e:
                 # e.message.split('DETAIL:  ')[1]
