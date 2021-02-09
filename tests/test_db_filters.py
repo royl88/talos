@@ -19,16 +19,23 @@ class _Base(crud.ResourceBase):
 
     def _unsupported_filter(self, query, idx, name, op, value):
         LOG.error('#############################unsupported filter#####################################')
-        LOG.error('index:%(idx)s name:%(name)s op:%(op)s value:%(value)s - %(sql)s' % {'sql': query,
-                                                                                       'idx': idx,
-                                                                                       'name': name,
-                                                                                       'op': op,
-                                                                                       'value': value})
+        LOG.error('index:%(idx)s name:%(name)s op:%(op)s value:%(value)s - %(sql)s' % {
+            'sql': query,
+            'idx': idx,
+            'name': name,
+            'op': op,
+            'value': value
+        })
         return crud.ResourceBase._unsupported_filter(self, query, idx, name, op, value)
 
     def _get_query(self, session, orm_meta=None, filters=None, orders=None, joins=None, ignore_default=False, **kwargs):
-        query = crud.ResourceBase._get_query(self, session, orm_meta=orm_meta,
-                                             filters=filters, orders=orders, joins=joins, ignore_default=ignore_default,
+        query = crud.ResourceBase._get_query(self,
+                                             session,
+                                             orm_meta=orm_meta,
+                                             filters=filters,
+                                             orders=orders,
+                                             joins=joins,
+                                             ignore_default=ignore_default,
                                              **kwargs)
         LOG.error('#############################get query#####################################')
         LOG.error('%s' % query)
@@ -157,7 +164,7 @@ def test_list_or_2():
     users = _User().list(filters={'$or': [{'id': '1'}]})
     assert len(users) == 1
     for u in users:
-        assert u['id'] in ('1',)
+        assert u['id'] in ('1', )
 
 
 def test_list_or_3():
@@ -196,13 +203,23 @@ def test_list_and_2():
 
 def test_list_complicate_1():
     # WHERE user.id = ? AND user.name = ? OR user.id = ? AND user.name = ? OR user.id = ?
-    users = _User().list(filters={'$or': [
-        {'$and': [{'id': '1'}, {'name': 'Deke'}]},
-        {'$and': [{'id': '2'}, {'name': 'Jacob'}]},
-        {'id': '3'}
-    ],
-    }
-    )
+    users = _User().list(filters={
+        '$or': [{
+            '$and': [{
+                'id': '1'
+            }, {
+                'name': 'Deke'
+            }]
+        }, {
+            '$and': [{
+                'id': '2'
+            }, {
+                'name': 'Jacob'
+            }]
+        }, {
+            'id': '3'
+        }],
+    })
     assert len(users) == 3
     for u in users:
         assert u['id'] in ('1', '2', '3')
@@ -212,8 +229,19 @@ def test_list_complicate_2():
     # WHERE user.id = ? AND user.name = ? AND (EXISTS (SELECT 1
     # FROM department
     # WHERE department.id = user.department_id AND department.id = ?)) AND user.age < ? AND user.age > ?
-    users = _User().list(filters={'$and': [{'id': '2'}, {'name': 'Jacob'},
-                                           {'department.id': '1'}, {'age': {'gt': 15, 'lt': 17}}]})
+    users = _User().list(
+        filters={'$and': [{
+            'id': '2'
+        }, {
+            'name': 'Jacob'
+        }, {
+            'department.id': '1'
+        }, {
+            'age': {
+                'gt': 15,
+                'lt': 17
+            }
+        }]})
     assert len(users) == 1
     assert users[0]['id'] == '2'
 
@@ -223,11 +251,25 @@ def test_list_complicate_3():
     # FROM department
     # WHERE department.id = user.department_id AND department.id = ?)) AND
     # (user.age < ? AND user.age > ? OR user.age IS NULL)
-    users = _User().list(filters={'$and': [{'department.id': '2'}, {
-        '$or': [{'age': {'gt': 2, 'lt': 4}}, {'age': None}]}]})
+    users = _User().list(
+        filters={'$and': [{
+            'department.id': '2'
+        }, {
+            '$or': [{
+                'age': {
+                    'gt': 2,
+                    'lt': 4
+                }
+            }, {
+                'age': None
+            }]
+        }]})
     assert len(users) == 2
     for u in users:
-        assert u['id'] in ('3', '4',)
+        assert u['id'] in (
+            '3',
+            '4',
+        )
 
 
 def test_update():
@@ -251,7 +293,7 @@ def test_get_1():
 
 
 def test_get_2():
-    addr = _Address().get(('3',))
+    addr = _Address().get(('3', ))
     assert addr['id'] == '3'
 
 
@@ -267,8 +309,11 @@ def test_get_error():
 
 def test_create():
     with _Address().transaction() as session:
-        addr = _Address(transaction=session).create(
-            resource={'id': 'auto_test_gen', 'location': 'auto_test_gen', 'user_id': '3'})
+        addr = _Address(transaction=session).create(resource={
+            'id': 'auto_test_gen',
+            'location': 'auto_test_gen',
+            'user_id': '3'
+        })
         assert addr['id'] == 'auto_test_gen'
         count, addrs = _Address(transaction=session).delete('auto_test_gen')
         assert count == 1
@@ -318,3 +363,83 @@ def test_dynamic_relationship():
 
     bs_query = _BusinessDisableDnyamicRel().get_list_query()
     assert 'address' in str(bs_query)
+
+
+def test_multi_level_relationship_error():
+    origin = CONF.dbcrud.unsupported_filter_as_empty
+    CONF.dbcrud.to_dict()['unsupported_filter_as_empty'] = True
+    assert len(_Business().list({'create_user.department.name': {'技术部'}})) == 0
+    CONF.dbcrud.to_dict()['unsupported_filter_as_empty'] = False
+    assert len(_Business().list({'create_user.department.name': {'技术部'}})) == 1
+    CONF.dbcrud.to_dict()['unsupported_filter_as_empty'] = origin
+
+
+def test_multi_level_relationship():
+    assert len(_Business().list({'create_user': {'addresses': {'location': '广州'}}})) == 1
+    assert _Business().count({'create_user': {'addresses': {'location': '广州'}}}) == 1
+    assert len(_Business().list({'create_user': {'addresses': {'location': '北京666'}}})) == 0
+    assert _Business().count({'create_user': {'addresses': {'location': '北京666'}}}) == 0
+    assert len(_Business().list({'create_user': {'department': {'name': '技术部'}}})) == 1
+    assert _Business().count({'create_user': {'department': {'name': '技术部'}}}) == 1
+    assert len(_Business().list({'create_user': {'department': {'name': '业务部'}}})) == 0
+    assert _Business().count({'create_user': {'department': {'name': '业务部'}}}) == 0
+    assert len(_Business().list({'create_user': {'department': {'name': '技术部'}, 'addresses': {'location': '广州'}}})) == 1
+    assert _Business().count({'create_user': {'department': {'name': '技术部'}, 'addresses': {'location': '广州'}}}) == 1
+    assert len(_Business().list({'create_user': {
+        'department': {
+            'name': '技术部'
+        },
+        'addresses': {
+            'location': '北京666'
+        }
+    }})) == 0
+    assert _Business().count({'create_user': {'department': {'name': '技术部'}, 'addresses': {'location': '北京666'}}}) == 0
+
+    assert len(_Business().list(
+        {'create_user': {
+            '$and': [{
+                'department': {
+                    'name': '技术部'
+                }
+            }, {
+                'addresses': {
+                    'location': '广州'
+                }
+            }]
+        }})) == 1
+    assert _Business().count(
+        {'create_user': {
+            '$and': [{
+                'department': {
+                    'name': '技术部'
+                }
+            }, {
+                'addresses': {
+                    'location': '广州'
+                }
+            }]
+        }}) == 1
+    assert len(_Business().list(
+        {'create_user': {
+            '$and': [{
+                'department': {
+                    'name': '技术部'
+                }
+            }, {
+                'addresses': {
+                    'location': '北京666'
+                }
+            }]
+        }})) == 0
+    assert _Business().count(
+        {'create_user': {
+            '$and': [{
+                'department': {
+                    'name': '技术部'
+                }
+            }, {
+                'addresses': {
+                    'location': '北京666'
+                }
+            }]
+        }}) == 0
