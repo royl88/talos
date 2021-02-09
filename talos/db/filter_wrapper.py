@@ -47,6 +47,21 @@ def get_filter(type_name, default_type=None):
         return _FILTER_REGISTER[default_type]
 
 
+def relationship_from_expression(table, expression):
+    expr_wrapper = None
+    fields = expression.split('.')
+    column = getattr(table, fields.pop(0), None)
+    while column is not None and fields and isinstance(column.property, relationships.RelationshipProperty):
+        column = getattr(table, fields.pop(0), None)
+    if not fields and column is not None and isinstance(column.property, relationships.RelationshipProperty):
+        expr_wrapper = column.has
+        if isinstance(column.impl, attributes.CollectionAttributeImpl):
+            expr_wrapper = column.any
+    else:
+        column = None
+    return expr_wrapper, column
+
+
 def column_from_expression(table, expression):
     expr_wrapper = None
     if '.' in expression:
@@ -70,14 +85,14 @@ def column_from_expression(table, expression):
                         expr_wrapper = column.any
                     sub_fields = fields[:]
                     sub_fields.insert(0, field)
-                    sub_expr_wrapper, column = column_from_expression(column.property.mapper.class_ , '.'.join(sub_fields))
+                    sub_expr_wrapper, column = column_from_expression(column.property.mapper.class_,
+                                                                      '.'.join(sub_fields))
                     fields = []
                     if sub_expr_wrapper is not None:
                         # relationship depth too many, can not forged column
                         column = None
                 else:
                     column = None
-            
             else:
                 column = None
     else:
@@ -103,7 +118,6 @@ def cast(column, value):
 
 
 class NullFilter(object):
-
     def make_empty_query(self, column):
         return column.is_(None) & column.isnot(None)
 
@@ -142,7 +156,7 @@ class NullFilter(object):
 
     def op_ends(self, column, value):
         pass
-    
+
     def op_nlike(self, column, value):
         pass
 
@@ -154,19 +168,18 @@ class NullFilter(object):
 
     def op_iends(self, column, value):
         pass
-    
+
     def op_nilike(self, column, value):
         pass
-    
+
     def op_nnull(self, column, value):
         pass
-    
+
     def op_null(self, column, value):
         pass
 
 
 class Filter(NullFilter):
-
     def make_empty_query(self, column):
         return column == None & column != None
 
@@ -256,7 +269,7 @@ class Filter(NullFilter):
             column = cast(column, value)
         expr = column.like('%%%s' % value)
         return expr
-    
+
     def op_nlike(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
@@ -280,17 +293,17 @@ class Filter(NullFilter):
             column = cast(column, value)
         expr = column.ilike('%%%s' % value)
         return expr
-    
+
     def op_nilike(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
         expr = column.notilike('%%%s%%' % value)
         return expr
-    
+
     def op_nnull(self, column, value):
         expr = column.isnot(None)
         return expr
-    
+
     def op_null(self, column, value):
         expr = column.is_(None)
         return expr
@@ -300,7 +313,6 @@ class FilterNetwork(NullFilter):
     '''
     用于PG数据库， 重写IP，CIDR的范围查询，不支持like操作
     '''
-
     def _fix_cidr(self, value):
         """
         fix_cidr('192')
@@ -449,10 +461,9 @@ class FilterNumber(Filter):
     '''
     数字类型不支持like操作
     '''
-
     def op_like(self, column, value):
         pass
-    
+
     def op_nlike(self, column, value):
         pass
 
@@ -464,7 +475,7 @@ class FilterNumber(Filter):
 
     def op_ilike(self, column, value):
         pass
-    
+
     def op_nilike(self, column, value):
         pass
 
@@ -473,13 +484,12 @@ class FilterNumber(Filter):
 
     def op_iends(self, column, value):
         pass
-    
-    
+
+
 class FilterBool(NullFilter):
     '''
     布尔类型
     '''
-
     def op(self, column, value):
         if utils.is_list_type(value):
             expr = None
@@ -488,7 +498,7 @@ class FilterBool(NullFilter):
                 column = cast(column, value)
             expr = column.is_(utils.bool_from_string(value))
         return expr
-    
+
     def op_eq(self, column, value):
         if isinstance(column, BinaryExpression):
             column = cast(column, value)
@@ -506,42 +516,41 @@ class FilterJSON(Filter):
     '''
     JSON/JSONB类型
     '''
-
     def op_hasall(self, column, value):
         if utils.is_list_type(value):
             expr = column.op('?&')(sqlcast(array(value), ARRAY(Text)))
         else:
             expr = column.op('?')(value)
         return expr
-    
+
     def op_hasany(self, column, value):
         if utils.is_list_type(value):
             expr = column.op('?|')(sqlcast(array(value), ARRAY(Text)))
         else:
             expr = column.op('?')(value)
         return expr
-    
+
     def op_within(self, column, value):
         if isinstance(value, (Mapping, list, tuple)):
             expr = column.op('<@')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
-    
+
     def op_nwithin(self, column, value):
         if isinstance(value, (Mapping, list, tuple)):
             expr = ~column.op('<@')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
-    
+
     def op_include(self, column, value):
         if isinstance(value, (Mapping, list, tuple)):
             expr = column.op('@>')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
-    
+
     def op_ninclude(self, column, value):
         if isinstance(value, (Mapping, list, tuple)):
             expr = ~column.op('@>')(sqlcast(value, JSONB))
