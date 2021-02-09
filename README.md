@@ -372,13 +372,24 @@ id在1,2,3,4内：{'id': ['1', '2', '3', '4']}
 
 更复杂的查询需要通过嵌套dict来实现[^ 5]：
 - 简单组合：{'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}
-- 简单$or+组合查询：{'$or': [{'字段名称': {'过滤条件': '值'}}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}
-- 简单$and+组合查询：{'$and': [{'字段名称': {'过滤条件': '值'}}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}
-- 复杂$and+$or+组合查询：
-  {'$and': [
-  ​               {'$or': [{'字段名称': '值'}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}, 
+
+- 简单\$or+组合查询：{'\$or': [{'字段名称': {'过滤条件': '值'}}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}
+
+- 简单\$and+组合查询：{'\$and': [{'字段名称': {'过滤条件': '值'}}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}
+
+- 复杂\$and+\$or+组合查询：
+  {'\$and': [
+  ​               {'\$or': [{'字段名称': '值'}, {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}]}, 
   ​               {'字段名称': {'过滤条件1': '值', '过滤条件2': '值'}}
   ]}
+  
+- relationship复杂查询(>=v1.3.6)：
+  
+  假定有User(用户)，Article(文章)，Comment(评论/留言)表，Article.owner引用User， Article.comments引用Comment，Comment.user引用User
+  
+  查询A用户发表的文章中，存在B用户的评论，且评论内容包含”你好“
+  
+  Article.list({'owner_id': 'user_a', 'comments': {'content': {'ilike': '你好', 'user': {'id': 'user_b'}}}})
 
 | 过滤条件 | 值类型          | 含义                                                           |
 | -------- | --------------- | -------------------------------------------------------------- |
@@ -1481,9 +1492,9 @@ Linux：msgfmt --output-file=cms.mo cms.po
 
 将mo文件发布到
 
-/etc/{$your_project}/locale/{$lang}/LC_MESSAGES/
+/etc/{\$your_project}/locale/{\$lang}/LC_MESSAGES/
 
-{$lang}即配置项中的language
+{\$lang}即配置项中的language
 
 
 
@@ -1652,7 +1663,7 @@ talos中预置了很多控制程序行为的配置项，可以允许用户进行
 }
 ```
 
-如上，variables中定义了定义了db_password变量(**必须在variables中定义变量**)，并再db.connection进行变量使用(**除variables以外其他配置项均可使用${db_password}变量进行待渲染**)
+如上，variables中定义了定义了db_password变量(**必须在variables中定义变量**)，并再db.connection进行变量使用(**除variables以外其他配置项均可使用\${db_password}变量进行待渲染**)
 
 在您自己的项目的server.wsgi_server 以及 server.celery_worker代码开始位置使用如下拦截：
 
@@ -1759,7 +1770,13 @@ def get_password(value, origin_value):
 
 ## CHANGELOG
 
+1.3.6:
+
+- 更新：[crud] relationship的多属性 & 多级嵌套 查询支持
+- 修复：[utils] http模块的i18n支持
+
 1.3.5:
+
 - 修复：[crud] _addtional_update的after_update参数取值无效问题
 
 1.3.4:
@@ -1843,7 +1860,7 @@ def get_password(value, origin_value):
 [^ 2]: v1.1.9版本中新增了TScheduler支持动态的定时任务以及更丰富的配置定义定时任务
 [^ 3]: v1.1.8版本中仅支持这类简单的定时任务
 [^ 4]: v1.2.0版本增加了__fields字段选择 以及 null, notnull, nlike, nilike的查询条件 以及 relationship查询支持
-[^ 5]: v1.2.0版本新增$or,$and查询支持
+[^ 5]: v1.2.0版本新增\$or,\$and查询支持
 [^ 6]: v1.2.3版本后开始支持
 [^ 7]: v1.3.0版本新增多数据库连接池支持以及日志handler选项
 [^ 8]: v1.3.0版本新增了Config项加载时的warnings，以提醒用户此配置项正确访问方式
