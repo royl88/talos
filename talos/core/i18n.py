@@ -20,7 +20,6 @@ class Translator():
 
     用户可以调用setup来更改当前locale
     """
-
     def __init__(self):
         self.default_language = None
         self._translation_maps = collections.OrderedDict()
@@ -39,25 +38,30 @@ class Translator():
             if len(lang) == 0:
                 LOG.warning('language(%s) files not found, no translation will be used', lang)
             for l in lang:
-                find_mo = gettext.find(app,
-                                    localedir=locales,
-                                    languages=[l])
+                find_mo = gettext.find(app, localedir=locales, languages=[l])
                 if find_mo:
                     # 加载所有指定语言 & 设置第一个有效mo文件的语言为默认语言
                     with open(find_mo, 'rb') as f:
                         self._translation_maps[l] = gettext.GNUTranslations(f)
+                        LOG.debug('language(%s) installed', l)
                     if self.default_language is None:
+                        LOG.debug('language(%s) set as default', l)
                         self.default_language = l
+                else:
+                    LOG.warning('language(%s) files not found', l)
         else:
+            LOG.debug('language(%s) set as default', lang)
             self.default_language = lang
             try:
                 self._translation_maps[lang] = gettext.translation(app, locales, [lang])
+                LOG.debug('language(%s) installed', lang)
             except IOError:
                 LOG.warning('language(%s) files not found, no translation will be used', lang)
 
     def change(self, lang):
         # 更改默认翻译语言
         if lang in self.available_languages:
+            LOG.debug('language(%s) changed to %s', self.default_language, lang)
             self.default_language = lang
             return True
         else:
@@ -66,9 +70,8 @@ class Translator():
     @property
     def available_languages(self):
         return list(self._translation_maps.keys())
-    
-    def client_prefers(self, accept, supported=None):
 
+    def client_prefers(self, accept, supported=None):
         def parse_language_range(language):
             lang, params = '', {}
             language_opts = language.split(';')
