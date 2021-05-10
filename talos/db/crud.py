@@ -379,7 +379,7 @@ class ResourceBase(object):
                         expr = expr_wrapper(expr)
             return expr
 
-        def _get_expression(filters):
+        def _get_expression(table, filters):
             '''
             将所有filters转换为表达式
             :param filters: 过滤条件字典
@@ -389,15 +389,26 @@ class ResourceBase(object):
             unsupported = []
             for name, value in filters.items():
                 if name in reserved_keys:
-                    _unsupported, expr = _get_key_expression(name, value)
+                    _unsupported, expr = _get_key_expression(table, name, value)
                 else:
-                    _unsupported, expr = _get_column_expression(name, value)
+                    expr_wrapper, column = filter_wrapper.relationship_from_expression(table, name)
+                    if column:
+                        _unsupported, expr = _get_expression(column.property.mapper.class_, value)
+                        if expr is not None:
+                            expr = expr_wrapper(expr)
+                    else:
+                        _unsupported, expr = _get_column_expression(table, name, value)
                 unsupported.extend(_unsupported)
-                if expr is not None:
+                if expr is not None and not isinstance(expr, list):
                     expressions.append(expr)
-            return unsupported, expressions
+            final_expr = None
+            if len(expressions) == 1:
+                final_expr = expressions[0]
+            elif len(expressions) > 1:
+                final_expr = and_(*expressions)
+            return unsupported, final_expr
 
-        def _get_key_expression(name, value):
+        def _get_key_expression(table, name, value):
             '''
             将$and, $or类的组合过滤转换为表达式
             :param name:
@@ -409,10 +420,9 @@ class ResourceBase(object):
             unsupported = []
             expressions = []
             for key_filters in value:
-                _unsupported, expr = _get_expression(key_filters)
+                _unsupported, expr = _get_expression(table, key_filters)
                 unsupported.extend(_unsupported)
-                if expr:
-                    expr = and_(*expr)
+                if expr is not None:
                     expressions.append(expr)
             if len(expressions) == 0:
                 return unsupported, None
@@ -421,7 +431,7 @@ class ResourceBase(object):
             else:
                 return unsupported, key_wrapper(*expressions)
 
-        def _get_column_expression(name, value):
+        def _get_column_expression(table, name, value):
             '''
             将列+值过滤转换为表达式
             :param name:
@@ -429,7 +439,7 @@ class ResourceBase(object):
             :param value:
             :type value:
             '''
-            expr_wrapper, column = filter_wrapper.column_from_expression(orm_meta, name)
+            expr_wrapper, column = filter_wrapper.column_from_expression(table, name)
             unsupported = []
             expressions = []
             if column is not None:
@@ -460,9 +470,9 @@ class ResourceBase(object):
         reserved_keys = self._filter_key_mapping()
         filters = filters or {}
         if filters:
-            unsupported, expressions = _get_expression(filters)
-            for expr in expressions:
-                query = query.filter(expr)
+            unsupported, expression = _get_expression(orm_meta, filters)
+            if expression is not None:
+                query = query.filter(expression)
             for idx, error_filter in enumerate(unsupported):
                 name, op, value = error_filter
                 query = self._unsupported_filter(query, idx, name, op, value)

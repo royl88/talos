@@ -13,6 +13,10 @@ from __future__ import absolute_import
 
 import os
 from talos.server import base
+from talos.middlewares import lazy_init
+from talos.middlewares import json_translator
+from talos.middlewares import limiter
+from talos.middlewares import globalvars
 # from talos.core import config
 
 
@@ -29,5 +33,16 @@ from talos.server import base
 
 application = base.initialize_server('${pkg_name}',
                                      os.environ.get('${pkg_name.upper()}_CONF', '${config_file}'),
-                                     conf_dir=os.environ.get('${pkg_name.upper()}_CONF_DIR', '${config_dir}'))
+                                     conf_dir=os.environ.get('${pkg_name.upper()}_CONF_DIR', '${config_dir}'),
+                                     middlewares=[
+                                         globalvars.GlobalVars(),
+                                         json_translator.JSONTranslator(),
+                                         lazy_init.LazyInit(limiter.Limiter)
+                                     ],
+                                     override_middlewares=True)
+# https://falcon.readthedocs.io/en/latest/api/app.html?#falcon.RequestOptions
+# keep empty query param, eg. ?a=&b=1 => {'a': '', 'b': '1'}
+application.req_options.keep_blank_qs_values = True
+# Flase: ?t=1,2,3&t=4 => ['1,2,3', '4']      True: t=1,2,3&t=4,5 => ['1', '2', '3', '4', '5']
+application.req_options.auto_parse_qs_csv = True
 '''
