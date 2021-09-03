@@ -32,7 +32,7 @@ class EnhancedHTTPError(falcon.HTTPError):
 
     def __init__(self, status, title=None, description=None, headers=None,
                  href=None, href_text=None, code=None, extra_data=None):
-        super(EnhancedHTTPError, self).__init__(status, title, description, headers, href, href_text, code)
+        super(EnhancedHTTPError, self).__init__(status, title=title, description=description, headers=headers, href=href, href_text=href_text, code=code)
         self._extra_data = extra_data or {}
 
     def to_dict(self, obj_type=dict):
