@@ -213,7 +213,7 @@ def test_fixed_window():
     time.sleep(1)
     resp = client.simulate_get('/fixedwindow')
     assert resp.status == falcon.HTTP_429
-    time.sleep(1)
+    time.sleep(1.1)
     resp = client.simulate_get('/fixedwindow')
     assert resp.status == falcon.HTTP_200
     time.sleep(1)
@@ -239,7 +239,7 @@ def test_moving_window():
     time.sleep(1)
     resp = client.simulate_get('/movingwindow')
     assert resp.status == falcon.HTTP_429
-    time.sleep(1)
+    time.sleep(1.1)
     resp = client.simulate_get('/movingwindow')
     assert resp.status == falcon.HTTP_200
     time.sleep(1)

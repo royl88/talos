@@ -13,7 +13,7 @@ talos project[^ 1]
 
 https://gitee.com/wu.jianjun/talos/tree/master/release
 
-项目是主要基于falcon和SQLAlemchy封装，提供常用的项目工具，便于用户编写API服务
+项目是主要基于falcon和SQLAlchemy封装，提供常用的项目工具，便于用户编写API服务
 项目提供了工具talos_generator，可以自动为您生成基于talos的api应用，并且目录结构基于python标准包管理
 
 * 基于falcon，高效
@@ -45,7 +45,7 @@ https://gitee.com/wu.jianjun/talos/tree/master/release
 > 请输入项目作者：Roy
 > 请输入项目作者Email：roy@test.com
 > 请输入项目启动配置目录：./etc #此处填写默认配置路径，相对路径是相对项目文件夹，也可以是绝对路径
-> 请输入项目DB连接串：postgresql+psycopg2://postgres:123456@127.0.0.1/testdb [SQLAlemchy的DB连接串]
+> 请输入项目DB连接串：postgresql+psycopg2://postgres:123456@127.0.0.1/testdb [SQLAlchemy的DB连接串]
 ### 创建项目目录：./cms
 ### 创建项目：cms(1.2.4)通用文件
 ### 创建启动服务脚本

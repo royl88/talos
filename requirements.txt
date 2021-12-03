@@ -2,12 +2,12 @@
 # of appearance. Changing the order has an impact on the overall integration
 # process, which may cause wedges in the gate later.
 
-falcon
+falcon==2.0.0
 six>=1.9.0
-SQLAlchemy>=1.1.0
-ipaddress
+SQLAlchemy>=1.1.0,<2.0
+ipaddress; python_version<'3.3'
 mako
 requests
 limits
-celery
+celery<5.0.0
 dogpile.cache
