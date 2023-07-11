@@ -28,7 +28,19 @@ https://gitee.com/wu.jianjun/talos/tree/master/release
 * 国际化i18n支持
 * SMTP邮件、AD域、CSV导出、缓存等常用模块集成
 
-首先setup.py install 安装talos,运行talos生成工具生成项目
+首先安装talos,运行talos生成工具生成项目
+
+推荐通过pip安装
+
+```bash
+pip install talos-api
+```
+
+或者通过源码安装
+
+```bash
+python setup.py install
+```
 
 
 
