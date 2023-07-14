@@ -6,7 +6,6 @@
 
 from __future__ import absolute_import
 
-from collections import Mapping
 import copy
 import json
 import functools
@@ -15,6 +14,7 @@ import warnings
 
 from mako.template import Template
 from talos.core import utils
+from talos.core import py3compat
 
 VAR_REGISTER = {}
 CONFIG_RESERVED = ('set_options', 'from_files', 'iterkeys', 'itervalues', 'iteritems', 'keys', 'values', 'items', 'get', 'to_dict', '_opts',
@@ -69,11 +69,11 @@ def _validate(data, keys=None):
             if key in CONFIG_RESERVED:
                 o_key['attr_type'] = False
                 warnings.warn('[config] access %s instead of %s' % (_valid_expr(allkeys), _simple_expr(allkeys)), SyntaxWarning)
-        if isinstance(value, Mapping):
+        if isinstance(value, py3compat.Mapping):
             _validate(value, keys=allkeys)
                 
 
-class Config(Mapping):
+class Config(py3compat.Mapping):
     """
     一个类字典的属性访问配置类， 表示一组或者多组实际的配置项
     1. 当属性是标准变量命名且非预留函数名时，可直接a.b.c方式访问
@@ -154,7 +154,7 @@ class Config(Mapping):
         """
         try:
             value = self._opts[name]
-            if isinstance(value, Mapping):
+            if isinstance(value, py3compat.Mapping):
                 return Config(value)
             return value
         except KeyError:
@@ -164,7 +164,7 @@ class Config(Mapping):
     def __getitem__(self, key):
         """魔法函数，实现类字典访问"""
         value = self._opts[key]
-        if isinstance(value, Mapping):
+        if isinstance(value, py3compat.Mapping):
             return Config(value)
         return value
 

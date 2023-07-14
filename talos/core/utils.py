@@ -24,6 +24,7 @@ import uuid
 
 import six
 
+from talos.core import py3compat
 
 class ComplexEncoder(json.JSONEncoder):
     """加强版的JSON Encoder，支持日期、日期+时间类型的转换"""
@@ -496,10 +497,10 @@ def get_item(data, expr, delimiter='.', default=None):
             break
 
         # 当前value是list/tuple/str/unicode/bytes
-        if isinstance(value, collections.Sequence):
+        if isinstance(value, py3compat.Sequence):
             value = _from_list(value, k, default=VALUE_NOT_EXIST)
         # 当前value是dict/orderdict/counter，获取字典对应k的值，并赋值到value
-        elif isinstance(value, collections.Mapping):
+        elif isinstance(value, py3compat.Mapping):
             value = value.get(k, VALUE_NOT_EXIST)
         # 否则直接返回default
         else:

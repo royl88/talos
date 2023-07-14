@@ -18,6 +18,7 @@ import sqlalchemy.exc
 import sqlalchemy.orm
 
 from talos.core import config
+from talos.core import py3compat
 from talos.core import exceptions
 from talos.core import utils
 from talos.core.i18n import _
@@ -444,7 +445,7 @@ class ResourceBase(object):
             expressions = []
             if column is not None:
                 handler = self._get_filter_handler(_extract_column_visit_name(column))
-                if isinstance(value, collections.Mapping):
+                if isinstance(value, py3compat.Mapping):
                     for operator, value in value.items():
                         expr = _handle_filter(expr_wrapper, handler, operator, column, value)
                         if expr is not None:

@@ -4,7 +4,8 @@
 
 falcon==2.0.0
 six>=1.9.0
-SQLAlchemy>=1.1.0,<2.0
+# 1.4.0版本对循环relationship的dynamic relationship load处理有问题，退回1.3.x使用
+SQLAlchemy>=1.1.0,<1.4.0
 ipaddress; python_version<'3.3'
 mako
 requests

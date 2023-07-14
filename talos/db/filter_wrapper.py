@@ -10,7 +10,6 @@ talos.db.filter_wrapper
 from __future__ import absolute_import
 
 import re
-from collections import Mapping
 
 from sqlalchemy import Text
 from sqlalchemy import cast as sqlcast
@@ -22,6 +21,7 @@ from sqlalchemy.sql.sqltypes import _type_map
 from sqlalchemy.dialects.postgresql import array, ARRAY, JSONB
 
 from talos.core import utils
+from talos.core import py3compat
 
 RE_CIDR = re.compile(r'^(\d{1,3}\.){0,3}\d{1,3}/\d{1,2}$')
 RE_IP = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
@@ -531,28 +531,28 @@ class FilterJSON(Filter):
         return expr
 
     def op_within(self, column, value):
-        if isinstance(value, (Mapping, list, tuple)):
+        if isinstance(value, (py3compat.Mapping, list, tuple)):
             expr = column.op('<@')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
 
     def op_nwithin(self, column, value):
-        if isinstance(value, (Mapping, list, tuple)):
+        if isinstance(value, (py3compat.Mapping, list, tuple)):
             expr = ~column.op('<@')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
 
     def op_include(self, column, value):
-        if isinstance(value, (Mapping, list, tuple)):
+        if isinstance(value, (py3compat.Mapping, list, tuple)):
             expr = column.op('@>')(sqlcast(value, JSONB))
         else:
             expr = None
         return expr
 
     def op_ninclude(self, column, value):
-        if isinstance(value, (Mapping, list, tuple)):
+        if isinstance(value, (py3compat.Mapping, list, tuple)):
             expr = ~column.op('@>')(sqlcast(value, JSONB))
         else:
             expr = None
